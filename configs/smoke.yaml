@@ -1,0 +1,8 @@
+# Fast pipeline smoke on the GPU machine (use with `--limit`).
+# Keeps the production patch (128^3) so it also checks real memory use, but runs only a
+# few epochs on a handful of cases. Deep-merged over configs/default.yaml.
+train:
+  max_epochs: 3
+  val_interval: 1
+  num_workers: 4
+  # batch_size stays 2 (default) and patch stays 128^3 (default) to mirror real training.

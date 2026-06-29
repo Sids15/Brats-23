@@ -1,0 +1,26 @@
+{
+  "_README": "Physics answer key (roadmap S9). This is DOCUMENTATION that *informs* the conditional-reliance test (S3.1) by recording which modality physically images each class's signal. It is NEVER used as a penalty or score (see roadmap CUT LIST: 'Physics-key-as-penalty'). A model that infers a class from correlated modalities is not automatically wrong; this key only states the physics expectation.",
+  "cohort": "ASNR-MICCAI-BraTS2023-GLI (adult glioma, pre-treatment)",
+  "channel_order": ["FLAIR", "T1", "T1CE", "T2"],
+  "modality_files": { "FLAIR": "t2f", "T1": "t1n", "T1CE": "t1c", "T2": "t2w" },
+  "classes": {
+    "ET": {
+      "physics_modality": "T1CE",
+      "rationale": "Enhancing tumor reflects blood-brain-barrier breakdown and contrast uptake, uniquely imaged on post-gadolinium T1 (T1CE).",
+      "expected_correlates": ["T1", "FLAIR", "T2"],
+      "correlate_note": "Enhancement co-locates with mass effect / necrosis morphology visible on T1 and surrounding edema on FLAIR/T2 -- legitimate correlated inference, not cheating."
+    },
+    "TC": {
+      "physics_modality": "T1CE",
+      "rationale": "Tumor core (enhancing tumor + necrotic core) is best delineated on T1CE; necrosis is hypointense on T1CE/T1.",
+      "expected_correlates": ["T1", "FLAIR", "T2"],
+      "correlate_note": "Core boundary partly tracks edema extent on FLAIR/T2."
+    },
+    "WT": {
+      "physics_modality": "FLAIR",
+      "rationale": "Whole tumor includes peritumoral edema, which is most conspicuous (hyperintense) on FLAIR and T2.",
+      "expected_correlates": ["T2", "T1CE", "T1"],
+      "correlate_note": "T2 carries nearly the same edema signal as FLAIR; WT is the least single-modality-unique class."
+    }
+  }
+}

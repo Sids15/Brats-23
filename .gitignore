@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Project artifacts (root-level only; leading slash so the src/ package dirs
+# `data/`, `splits/`, `models/`, `metrics/` are NOT ignored)
+/splits/
+/runs/
+/outputs/
+checkpoints/
+logs/
+wandb/
+*.pt
+*.pth
+*.ckpt
+
+# Data (never commit medical imaging)
+/data/
+*.nii
+*.nii.gz
+
+# OS / editor
+desktop.ini
+.DS_Store
+.idea/
+.vscode/
+.ipynb_checkpoints/
