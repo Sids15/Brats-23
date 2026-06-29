@@ -305,7 +305,14 @@ class RunContext:
         }
         write_json(self.run_dir / "run_summary.json", summary)
         self.logger.info("Run finalized: %.1fs (%.3f GPU-h)", duration_s, summary["gpu_hours"])
+        self.close()
         return summary
+
+    def close(self) -> None:
+        """Close and detach log handlers (releases ``run.log`` so the dir can be removed)."""
+        for handler in list(self.logger.handlers):
+            handler.close()
+            self.logger.removeHandler(handler)
 
 
 def _build_logger(name: str, log_path: Path) -> logging.Logger:

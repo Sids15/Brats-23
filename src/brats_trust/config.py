@@ -13,6 +13,7 @@ Usage:
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -66,3 +67,10 @@ def load_config(*overrides: str | Path, default: str | Path = DEFAULT_CONFIG) ->
         with open(ov, "r", encoding="utf-8") as fh:
             merged = _deep_merge(merged, yaml.safe_load(fh) or {})
     return _to_namespace(merged)
+
+
+def load_physics_key(cfg: Config | None = None) -> dict:
+    """Load ``physics_answer_key.json`` (path from config). Documents the physics
+    expectation that informs the reliance test; never used as a penalty (roadmap CUT LIST)."""
+    cfg = cfg or load_config()
+    return json.loads((REPO_ROOT / cfg.physics_key).read_text(encoding="utf-8"))
