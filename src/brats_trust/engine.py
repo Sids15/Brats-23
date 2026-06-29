@@ -19,6 +19,29 @@ def get_device() -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+def _mean_fill_channel(image: torch.Tensor, channel: int) -> torch.Tensor:
+    """Torch-native mean-fill of one channel of a ``(C, X, Y, Z)`` image (matches
+    ``data.preprocess.intervene``); used in the training-time modality-dropout fix."""
+    out = image.clone()
+    brain = (image != 0).any(dim=0)
+    vals = image[channel][brain]
+    fill = vals.mean() if vals.numel() > 0 else image.new_tensor(0.0)
+    out[channel] = 0.0
+    out[channel][brain] = fill
+    return out
+
+
+def apply_modality_dropout(images: torch.Tensor, prob: float) -> torch.Tensor:
+    """Per sample in a batch ``(B, C, X, Y, Z)``, with probability ``prob`` mean-fill one
+    random modality (roadmap S6: the *acceptable* robustness fix). Mean-fill, not zero."""
+    out = images.clone()
+    n_channels = images.shape[1]
+    for b in range(images.shape[0]):
+        if torch.rand(1).item() < prob:
+            out[b] = _mean_fill_channel(images[b], int(torch.randint(0, n_channels, (1,)).item()))
+    return out
+
+
 def build_loss() -> nn.Module:
     # sigmoid=True for overlapping (non-mutually-exclusive) WT/TC/ET channels.
     return DiceCELoss(sigmoid=True)
@@ -69,6 +92,12 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
     epochs = max_epochs if max_epochs is not None else cfg.train.max_epochs
 
+    # Modality-dropout fix (roadmap S6): on for the last (1 - start_frac) of training.
+    md = getattr(cfg.train, "modality_dropout", None)
+    md_enabled = bool(getattr(md, "enabled", False)) if md is not None else False
+    md_start = int(getattr(md, "start_frac", 0.8) * epochs) if md_enabled else epochs
+    md_prob = float(getattr(md, "prob", 0.25)) if md_enabled else 0.0
+
     best_dice = 0.0
     for epoch in tqdm(range(epochs), desc="train", unit="epoch"):
         model.train()
@@ -76,6 +105,8 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
         for batch in train_loader:
             images = batch["image"].to(device)
             labels = batch["label"].to(device)
+            if md_enabled and epoch >= md_start:
+                images = apply_modality_dropout(images, md_prob)
             optimizer.zero_grad(set_to_none=True)
             with torch.amp.autocast("cuda", enabled=use_amp):
                 logits = model(images)

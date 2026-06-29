@@ -48,6 +48,10 @@ train:
   val_interval: 5           # run validation every N epochs
   amp: true                 # mixed precision (24 GB RTX 4500 Ada target); auto-off on CPU
   num_workers: 8
+  modality_dropout:         # roadmap S6 (optional fix): mean-fill a random modality late in training
+    enabled: false
+    prob: 0.25
+    start_frac: 0.8         # only the last 20% of epochs
 
 inference:                  # roadmap S9: sliding window + Gaussian stitch + TTA + CCA
   sliding_window: true
