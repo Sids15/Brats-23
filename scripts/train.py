@@ -34,12 +34,17 @@ def main() -> None:
     ap.add_argument("--config", default=None)
     ap.add_argument("--name", default="train")
     ap.add_argument("--epochs", type=int, default=None, help="Override max_epochs.")
+    ap.add_argument("--limit", type=int, default=None,
+                    help="Cap #cases for a fast pipeline smoke (train=limit, val=limit//4).")
     args = ap.parse_args()
 
     cfg = load_config(args.config) if args.config else load_config()
     root, sp = resolve_splits(cfg)
     train_dirs = [root / c for c in sp["train"]]
     val_dirs = [root / c for c in sp["val"]]
+    if args.limit:
+        train_dirs = train_dirs[: args.limit]
+        val_dirs = val_dirs[: max(2, args.limit // 4)]
 
     train_loader = make_dataloader(train_dirs, cfg, train=True, num_workers=cfg.train.num_workers)
     val_loader = make_dataloader(val_dirs, cfg, train=False, batch_size=1)

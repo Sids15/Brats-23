@@ -43,6 +43,28 @@ shapes/affines, labels ⊆ {1,2,3}, no NaNs.
 **If `n_failed` > 0:** send me `outputs/preflight/manifest.csv` (the `issues` column names
 the problem per case). We decide whether to exclude or fix those cases.
 
+## Stage 1c — Pipeline smoke on REAL data (do this right after preflight)
+Confirms preprocessing + dataloader + training + validation + inference + tidy outputs all
+work on real BraTS, fast, before committing to long runs.
+```bash
+python scripts/train.py --config configs/smoke.yaml --name smoke --limit 24
+```
+This uses the production patch `128^3` and `batch_size: 2` on 24 cases for 3 epochs
+(validates every epoch). **Batch size:** 2 is the default and fits an RTX 4500 Ada (24 GB)
+with AMP for our scaffold and DynUNet at `128^3`. If you hit CUDA OOM, drop to
+`batch_size: 1` (edit `configs/smoke.yaml`) or patch `96^3`.
+**Expected:** progress bar runs; `runs/<ts>__smoke/` appears with `metrics.csv` (loss going
+down, a val `mean_dice`), `best_model.pt`, `config.yaml`, `env.json` (check it shows your GPU
++ CUDA). Dice will be low (only 3 epochs / 24 cases) — that's fine; we're testing plumbing.
+**Then evaluate the smoke model** (exercises reliance + fragility on real data):
+```bash
+python scripts/evaluate.py --config configs/smoke.yaml --checkpoint runs/<ts>__smoke/best_model.pt --split val
+```
+**Expected:** `runs/<eval>/results/` has `per_case_metrics.csv`, `reliance_matrix.csv`
+(12 rows), `fragility.csv` (6 rows).
+**What to send me:** the `metrics.csv`, the `env.json` (to confirm GPU/CUDA), and any error
+or OOM traceback. From there we green-light full training.
+
 ## Stage 2 — Receptive-field sweep, THE DECISIVE STEP (§4, §4.1)  [orchestration CPU-verified]
 First a baseline sanity train, then the sweep + analysis.
 ```bash
@@ -138,6 +160,19 @@ soften "wrong reasons" → "modality-reliance profiling".
 
 ---
 
-## Stages 6–7 — appended as the code lands
-(6 = optional modality-dropout fix + does-it-improve-faithfulness check, 7 = toolkit/Docker/
-write-up.) Each gets the same Command / Expected / If-it-fails block.
+## Stage 6 — Optional modality-dropout fix (§6)  [CPU-verified]
+Trains baseline vs the fix (randomly mean-fill a modality in the last 20% of training) and
+compares. Enable via `configs/default.yaml` → `train.modality_dropout.enabled: true`, or use:
+```bash
+python scripts/run_fix.py --config configs/default.yaml --out outputs/fix
+```
+**Expected:** `outputs/fix/fix_comparison.json` with `delta_faithfulness` and
+`delta_val_dice`. The roadmap's evidence bar (§6): **faithfulness improves** (`delta_faithfulness
+> 0`) while **Dice holds** (`delta_val_dice ≈ 0` or better); also check the fragility gap
+shrinks via `scripts/aggregate.py` on the two run sets. We report what we measure — the fix
+may just even out reliance.
+**What to send me:** `fix_comparison.json` (+ aggregated `fragility_gap.csv` for both).
+
+## Stage 7 — Toolkit + write-up — appended as the code lands
+(Packaging the repo as a reusable toolkit + Docker/MLCube; the paper draft.) Added here with
+Command / Expected / If-it-fails when built.
