@@ -52,7 +52,7 @@ process. Read this before contributing.
 - **Commit frequently** in small, logical chunks — the history is part of the record.
 - **Run the security audit before every commit:** `python scripts/security_audit.py`
   (staged) — it must exit 0 (no HIGH findings). Use `--all` for a full sweep.
-- **Every commit carries both co-author trailers:**
+- **Every commit carries the co-author trailer:**
   ```
   Co-Authored-By: rishabhahuja12 <rishabhahuja961@gmail.com>
   ```
