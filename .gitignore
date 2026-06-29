@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Project artifacts
+splits/
+runs/
+outputs/
+checkpoints/
+logs/
+wandb/
+*.pt
+*.pth
+*.ckpt
+
+# Data (never commit medical imaging)
+data/
+*.nii
+*.nii.gz
+
+# OS / editor
+desktop.ini
+.DS_Store
+.idea/
+.vscode/
+.ipynb_checkpoints/

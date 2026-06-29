@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "brats-trust"
+version = "0.0.1"
+description = "BraTS-Trust: intervention-based conditional modality-reliance ('faithfulness') measurement for 3D brain-tumor segmentation."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Sids15" }]
+
+# Pinned loosely on purpose; lock versions on the training machine once it runs.
+dependencies = [
+    "torch>=2.2",
+    "monai>=1.3",
+    "nibabel>=5.2",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "scikit-learn>=1.4",
+    "statsmodels>=0.14",   # multiple-comparison correction + CIs (roadmap S3, S4.2)
+    "pandas>=2.1",
+    "pyyaml>=6.0",
+    "matplotlib>=3.8",
+    "tqdm>=4.66",
+    "einops>=0.7",
+]
+
+[project.optional-dependencies]
+xai = ["grad-cam>=1.5"]          # roadmap S3.4 XAI-fails check
+dev = ["pytest>=8.0", "ruff>=0.5"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+brats_trust = ["physics_answer_key.json"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+# src layout: make the package importable without a full editable install
+# (which would pull heavy CUDA deps not needed for these torch-free tests).
+pythonpath = ["src"]
+testpaths = ["tests"]
