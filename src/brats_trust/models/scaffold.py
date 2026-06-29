@@ -16,9 +16,26 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 IN_CHANNELS = 4
 OUT_CHANNELS = 3
+
+
+def _align_to(x: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:
+    """Pad/crop x's spatial dims to match ref's, so skip-concat works for any input size.
+
+    Pooling floor-divides odd dimensions while transposed conv doubles them, so an
+    arbitrary-sized (e.g. brain-cropped) volume can produce off-by-one skip mismatches.
+    """
+    diffs = [r - s for s, r in zip(x.shape[2:], ref.shape[2:])]
+    if any(d != 0 for d in diffs):
+        pad: list[int] = []
+        for d in reversed(diffs):
+            pad += [0, max(d, 0)]
+        x = F.pad(x, pad)
+        x = x[:, :, : ref.shape[2], : ref.shape[3], : ref.shape[4]]
+    return x
 
 
 def _norm_act(channels: int) -> nn.Sequential:
@@ -109,6 +126,7 @@ class UNet3D(nn.Module):
         x = self.bottleneck(x)
         for upconv, dec, skip in zip(self.upconvs, self.decoders, reversed(skips)):
             x = upconv(x)
+            x = _align_to(x, skip)
             x = dec(torch.cat([x, skip], dim=1))
         return self.head(x)
 

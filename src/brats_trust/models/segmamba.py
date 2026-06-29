@@ -14,6 +14,8 @@ from __future__ import annotations
 import torch
 from torch import nn
 
+from .scaffold import _align_to
+
 try:
     from mamba_ssm import Mamba
     _HAS_MAMBA = True
@@ -96,6 +98,7 @@ class SegMamba(nn.Module):
         x = self.bottleneck(x)
         for upconv, dec, skip in zip(self.upconvs, self.decoders, reversed(skips)):
             x = upconv(x)
+            x = _align_to(x, skip)
             x = dec(torch.cat([x, skip], dim=1))
         return self.head(x)
 

@@ -34,6 +34,14 @@ def test_anchor_builds_and_forwards(name, size):
     assert out.shape == (1, 3, size, size, size)
 
 
+def test_scaffold_handles_arbitrary_input_size():
+    # Brain-cropped volumes have odd, non-power-of-2 dims; the U-Net must still run.
+    model = build_model(_cfg("unet3d", 32)).eval()
+    with torch.no_grad():
+        out = model(torch.randn(1, 4, 28, 30, 26))
+    assert out.shape == (1, 3, 28, 30, 26)
+
+
 def test_unknown_model_raises():
     cfg = _cfg("not_a_model", 32)
     with pytest.raises(ValueError):
