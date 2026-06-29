@@ -64,11 +64,28 @@ pytest -q                                            # skeleton smoke tests
 Training target: RTX 4500 Ada (24 GB). `train.amp` is on; `patch_size`
 `128^3` fits comfortably.
 
+## Running
+
+The whole pipeline is verified end-to-end on CPU with synthetic data, so on the GPU
+machine it's plug-and-play. Set `data.root` in `configs/default.yaml`, then:
+
+```bash
+python scripts/preflight.py                       # 1. validate the dataset (run first)
+python scripts/train.py --name baseline_seed42    # 2. train (CUDA + AMP auto-detected)
+python scripts/evaluate.py --checkpoint runs/<run>/best_model.pt   # 3. paper-ready results
+
+python scripts/run_synthetic_check.py             # S3.5 sanity check (CPU, no real data)
+```
+
+Each run writes a timestamped `runs/<ts>__<name>/` with config snapshot, env, curves, and
+tidy `results/` (per-case + aggregate metrics, reliance matrix, fragility) — see
+`docs/ARCHITECTURE.md`.
+
 ## Build order (roadmap S12)
 
-0. Protocol, ablation dataloader, scaffold, metric, physics key  ← *skeleton done; logic next*
-1. Synthetic sanity check (S3.5)
-2. **Probe 3 RF sweep — DECISIVE** (does effective RF predict faithfulness?)
+0. Protocol, ablation dataloader, scaffold, metric, physics key  ← *done (CPU-verified)*
+1. Synthetic sanity check (S3.5)  ← *done: `scripts/run_synthetic_check.py` passes*
+2. **Probe 3 RF sweep — DECISIVE** (does effective RF predict faithfulness?)  ← *next, on GPU*
 3. If yes → Probe 1/2 + Tier-A anchors
 4. Reliance matrices, comparative fragility, XAI-fails, statistics
 5. Characterize ERF↔faithfulness + consequence

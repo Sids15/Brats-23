@@ -40,24 +40,33 @@ src/brats_trust/
                       Config is attribute-accessible and round-trips to dict for logging.
   logging_utils.py    Reproducibility + research-grade run logging (see S5 below).
   physics_answer_key.json   Physics expectation (documentation artifact).
+  engine.py           Train loop + sliding-window inference (AMP on CUDA).     [done]
+  pipeline.py         evaluate_and_log: writes all paper-ready tidy outputs.   [done]
+  preflight.py        Dataset validation core (shapes/affines/labels/finite).  [done]
   data/
-    splits.py         Patient-level, leakage-free train/val/test splits.      [done]
+    splits.py         Patient-level, leakage-free train/val/test splits.       [done]
     preprocess.py     Brain-crop, per-channel z-score, modality intervention.  [done]
     synthetic.py      S3.5 calibration generator (known class->channel coupling).[done]
-    dataset.py        Ablation-capable MONAI loader: mean-fill channel k (S3.1).[stub: torch]
+    dataset.py        Ablation-capable MONAI loader (4ch in, WT/TC/ET out).    [done]
   models/
-    scaffold.py       Single shared U-Net; one pluggable block for the probes (S4).[stub: torch]
+    scaffold.py       Shared 3D U-Net; pluggable conv/dwsep block (S4 Probe 3).[done]
   metrics/
-    stats.py          Bootstrap CIs, effect sizes, Holm correction (S3, S4.2).  [done]
-    reliance.py       aggregate_reliance [done]; collect_reliance_deltas        [stub: torch]
-    fragility.py      CONSEQUENCE: comparative missing-modality fragility (S3.3).[stub: torch]
+    stats.py          Bootstrap CIs, effect sizes, Holm correction (S3, S4.2). [done]
+    segmentation.py   Per-region Dice + HD95 + sens/spec (BraTS-2023).         [done]
+    reliance.py       Conditional intervention reliance, per-case + aggregate. [done]
+    fragility.py      CONSEQUENCE: comparative missing-modality fragility (S3.3).[done]
 scripts/
+  train.py            Train the scaffold (CUDA or CPU).
+  evaluate.py         Evaluate a checkpoint -> all tidy results.
+  preflight.py        Validate the real dataset before training (run first).
+  run_synthetic_check.py  S3.5 end-to-end sanity check (CPU, no real data).
   make_splits.py      CLI wrapper around data.splits.
   security_audit.py   Pre-commit secret/PII scan (enforced gate).
 configs/default.yaml  The frozen S9 global protocol.
 ```
-`[done]` = implemented + unit-tested (torch-free). `[stub: torch]` = interface + docstring
-defined; logic needs torch/MONAI and lands on the training machine (build order S12).
+`[done]` = implemented + tested. The whole chain (load -> train -> infer -> reliance ->
+fragility -> tidy outputs) is verified end-to-end on CPU with synthetic data
+(`scripts/run_synthetic_check.py`, `tests/test_pipeline.py`); the GPU only adds scale.
 
 ## 4. Configuration
 `configs/default.yaml` encodes the non-negotiable S9 protocol (cohort, channel order,
