@@ -16,7 +16,7 @@ from brats_trust.data.dataset import make_dataloader
 from brats_trust.data.splits import load_splits, make_splits
 from brats_trust.engine import get_device, train_model
 from brats_trust.logging_utils import setup_run
-from brats_trust.models.scaffold import build_scaffold
+from brats_trust.models.factory import build_model
 
 
 def resolve_splits(cfg):
@@ -44,9 +44,7 @@ def main() -> None:
     train_loader = make_dataloader(train_dirs, cfg, train=True, num_workers=cfg.train.num_workers)
     val_loader = make_dataloader(val_dirs, cfg, train=False, batch_size=1)
 
-    model = build_scaffold(
-        block=cfg.model.block, features=cfg.model.features, kernel_size=cfg.model.kernel_size
-    )
+    model = build_model(cfg)
     ctx = setup_run(args.name, cfg, set_global_seed=cfg.seed)
     ctx.logger.info("train=%d val=%d cases | device=%s", len(train_dirs), len(val_dirs), get_device())
     best = train_model(model, train_loader, val_loader, cfg, ctx, max_epochs=args.epochs)

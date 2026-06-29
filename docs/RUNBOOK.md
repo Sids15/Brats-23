@@ -69,7 +69,30 @@ apply the §4.2 protocol (report matched + tuned, exclude non-converged under pr
 
 ---
 
-## Stages 3–7 — appended as the code lands
-(3 = other architectures + anchors, 4 = full reliance/fragility/XAI + stats, 5 =
-characterize, 6 = optional fix, 7 = toolkit/Docker/write-up.) Each will get the same
-Command / Expected / If-it-fails block here as it's built.
+## Stage 3 — Architecture sweep: Probe 1 + Tier-A anchors (§4 Probe 1, §5)  [MONAI anchors CPU-verified; SegMamba GPU-only]
+Compares architectures (CNN / transformer / Mamba) under the *matched* protocol.
+```bash
+# one-time, for the Mamba arm (CUDA build required):
+pip install mamba-ssm causal-conv1d
+
+python scripts/run_probe1.py --config configs/default.yaml --out outputs/probe1
+```
+Models: `unet3d` (our scaffold), `dynunet` (nnU-Net architecture), `unetr`, `swin_unetr`,
+`segmamba`. Restrict with `--models unet3d dynunet unetr`.
+**Expected:** `outputs/probe1/probe1_summary.csv` — one row per architecture×seed with
+faithfulness (WT/TC/ET + overall), ERF, and val Dice. If `mamba-ssm` is missing you'll see
+`SKIP segmamba: ...` and the others still run.
+**Caveat to keep in the writeup (§4):** an architecture swap changes receptive field +
+optimization + inductive bias at once — report as "contribution under matched protocol",
+never "causes".
+**If `swin_unetr` errors on size:** it needs inputs divisible by 32 and ≥64³ (our 128³
+patch is fine). **If a model OOMs on the GPU:** lower `train.batch_size` or `model.features`;
+send me the error. **What to send me:** `probe1_summary.csv` (+ any failing run's
+`metrics.csv`).
+
+---
+
+## Stages 4–7 — appended as the code lands
+(4 = full reliance/fragility matrices across models + XAI-fails + statistics, 5 =
+characterize ERF↔faithfulness, 6 = optional modality-dropout fix, 7 = toolkit/Docker/
+write-up.) Each gets the same Command / Expected / If-it-fails block here as it's built.

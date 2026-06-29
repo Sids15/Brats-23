@@ -16,7 +16,7 @@ from brats_trust.config import load_config, load_physics_key
 from brats_trust.data.splits import load_splits
 from brats_trust.engine import get_device
 from brats_trust.logging_utils import setup_run
-from brats_trust.models.scaffold import build_scaffold
+from brats_trust.models.factory import build_model
 from brats_trust.pipeline import evaluate_and_log
 
 
@@ -34,9 +34,7 @@ def main() -> None:
     case_dirs = [root / c for c in sp[args.split]]
 
     device = get_device()
-    model = build_scaffold(
-        block=cfg.model.block, features=cfg.model.features, kernel_size=cfg.model.kernel_size
-    )
+    model = build_model(cfg)
     model.load_state_dict(torch.load(args.checkpoint, map_location=device))
 
     ctx = setup_run(args.name, cfg)
