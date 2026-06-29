@@ -9,10 +9,11 @@ dist/
 venv/
 env/
 
-# Project artifacts
-splits/
-runs/
-outputs/
+# Project artifacts (root-level only; leading slash so the src/ package dirs
+# `data/`, `splits/`, `models/`, `metrics/` are NOT ignored)
+/splits/
+/runs/
+/outputs/
 checkpoints/
 logs/
 wandb/
@@ -21,7 +22,7 @@ wandb/
 *.ckpt
 
 # Data (never commit medical imaging)
-data/
+/data/
 *.nii
 *.nii.gz
 
