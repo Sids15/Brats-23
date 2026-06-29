@@ -92,7 +92,30 @@ send me the error. **What to send me:** `probe1_summary.csv` (+ any failing run'
 
 ---
 
-## Stages 4–7 — appended as the code lands
-(4 = full reliance/fragility matrices across models + XAI-fails + statistics, 5 =
-characterize ERF↔faithfulness, 6 = optional modality-dropout fix, 7 = toolkit/Docker/
-write-up.) Each gets the same Command / Expected / If-it-fails block here as it's built.
+## Stage 4 — Full measurement: statistics + XAI-fails (§3, §3.4, §4.2)  [CPU-verified]
+After the sweeps, aggregate across seeds and run the saliency check.
+```bash
+# pool seeds of one variant -> tables + significance (shell expands the glob):
+python scripts/aggregate.py --runs runs/probe3_rf_small_seed* --out outputs/agg_rf_small
+
+# saliency blindness check on a trained model:
+python scripts/run_xai_check.py --checkpoint runs/<run>/best_model.pt
+```
+**Expected (aggregate):** under `--out`, `aggregate_segmentation.csv` (Dice/HD95 mean+CI per
+region), `reliance_matrix.csv` (reliance averaged across seeds + CI), and
+`fragility_gap.csv` with a `mean_gap` and **Holm-corrected `p_holm`** per region. A
+**positive gap with small `p_holm`** = removing the leaned-on modality hurts more than
+removing the physics one → consequential unfaithfulness (§3.3).
+**Expected (XAI):** `mean_saliency_cosine` is **high (≈0.8–1.0)** even after T1CE is
+mean-filled → saliency barely moves → it's blind to the modality shortcut, justifying the
+intervention-first stack (§3.4). `results/msfi.csv` reports the saliency share on the
+physics modality (convergent check).
+**What to send me:** `outputs/agg_*/summary.json` + `fragility_gap.csv`, and the XAI
+`mean_saliency_cosine`. If the fragility gap is **not** positive/significant, that's the
+signal to soften "wrong reasons" → "modality-reliance profiling" (§5) — a valid outcome.
+
+---
+
+## Stages 5–7 — appended as the code lands
+(5 = characterize ERF↔faithfulness + the summary figure, 6 = optional modality-dropout fix,
+7 = toolkit/Docker/write-up.) Each gets the same Command / Expected / If-it-fails block.
