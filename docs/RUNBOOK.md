@@ -116,6 +116,28 @@ signal to soften "wrong reasons" → "modality-reliance profiling" (§5) — a v
 
 ---
 
-## Stages 5–7 — appended as the code lands
-(5 = characterize ERF↔faithfulness + the summary figure, 6 = optional modality-dropout fix,
-7 = toolkit/Docker/write-up.) Each gets the same Command / Expected / If-it-fails block.
+## Stage 5 — Characterize + summary figure (§4.1, §5, §11)  [CPU-verified]
+Pull the headline numbers together into one panel.
+```bash
+python scripts/analyze_probe3.py --summary outputs/probe3/probe3_summary.jsonl   # the curve + Spearman
+python scripts/make_summary_figure.py \
+    --reliance outputs/agg_rf_small/reliance_matrix.jsonl \
+    --probe3   outputs/probe3/probe3_summary.jsonl \
+    --fragility outputs/agg_rf_small/fragility_gap.jsonl \
+    --xai      runs/<xai_run>/results/xai_fails.jsonl \
+    --out      outputs/summary_figure.png
+```
+**Expected:** `outputs/summary_figure.png` — a 2×2 panel (reliance heatmap · ERF↔faithfulness
+scatter with Spearman ρ · fragility gap · saliency-cosine histogram). Any panel whose input
+is omitted shows a "no data" placeholder, so you can build it up as stages finish.
+**Reading the result (§5):** a clean **negative ERF↔faithfulness trend** is the headline; a
+**positive fragility gap** confirms the consequence; **high XAI cosine** confirms saliency is
+blind. If the ERF trend is null (ρ≈0), report it honestly as a focused negative result and
+soften "wrong reasons" → "modality-reliance profiling".
+**What to send me:** `summary_figure.png` + `erf_faithfulness_stats.json`.
+
+---
+
+## Stages 6–7 — appended as the code lands
+(6 = optional modality-dropout fix + does-it-improve-faithfulness check, 7 = toolkit/Docker/
+write-up.) Each gets the same Command / Expected / If-it-fails block.
