@@ -51,6 +51,8 @@ tests/test_smoke.py
 - [`rules.md`](./rules.md) — operating rules (env, naming, logging, git, security).
 - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — system architecture + run-dir schema
   (also seeds the paper's Methods/Reproducibility sections).
+- [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) — stage-by-stage commands, expected results, and
+  what to send back if a result looks wrong.
 
 ## Setup
 

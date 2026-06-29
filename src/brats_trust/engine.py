@@ -10,6 +10,7 @@ import torch
 from monai.inferers import sliding_window_inference
 from monai.losses import DiceCELoss
 from torch import nn
+from tqdm import tqdm
 
 from .metrics.segmentation import compute_case_metrics, postprocess
 
@@ -69,7 +70,7 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
     epochs = max_epochs if max_epochs is not None else cfg.train.max_epochs
 
     best_dice = 0.0
-    for epoch in range(epochs):
+    for epoch in tqdm(range(epochs), desc="train", unit="epoch"):
         model.train()
         epoch_loss = 0.0
         for batch in train_loader:
