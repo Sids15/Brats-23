@@ -41,19 +41,23 @@ src/brats_trust/
   logging_utils.py    Reproducibility + research-grade run logging (see S5 below).
   physics_answer_key.json   Physics expectation (documentation artifact).
   data/
-    splits.py         Patient-level, leakage-free train/val/test splits.      [stub]
-    dataset.py        Ablation-capable loader: mean-fill channel k (S3.1).    [stub]
+    splits.py         Patient-level, leakage-free train/val/test splits.      [done]
+    preprocess.py     Brain-crop, per-channel z-score, modality intervention.  [done]
+    synthetic.py      S3.5 calibration generator (known class->channel coupling).[done]
+    dataset.py        Ablation-capable MONAI loader: mean-fill channel k (S3.1).[stub: torch]
   models/
-    scaffold.py       Single shared U-Net; one pluggable block for the probes (S4). [stub]
+    scaffold.py       Single shared U-Net; one pluggable block for the probes (S4).[stub: torch]
   metrics/
-    reliance.py       PRIMARY: conditional intervention reliance matrix (S3.1). [stub]
-    fragility.py      CONSEQUENCE: comparative missing-modality fragility (S3.3).[stub]
+    stats.py          Bootstrap CIs, effect sizes, Holm correction (S3, S4.2).  [done]
+    reliance.py       aggregate_reliance [done]; collect_reliance_deltas        [stub: torch]
+    fragility.py      CONSEQUENCE: comparative missing-modality fragility (S3.3).[stub: torch]
 scripts/
   make_splits.py      CLI wrapper around data.splits.
   security_audit.py   Pre-commit secret/PII scan (enforced gate).
 configs/default.yaml  The frozen S9 global protocol.
 ```
-`[stub]` = interface + docstring defined, logic lands in Stage 0+ (build order S12).
+`[done]` = implemented + unit-tested (torch-free). `[stub: torch]` = interface + docstring
+defined; logic needs torch/MONAI and lands on the training machine (build order S12).
 
 ## 4. Configuration
 `configs/default.yaml` encodes the non-negotiable S9 protocol (cohort, channel order,
