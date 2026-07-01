@@ -36,7 +36,7 @@ def main() -> None:
     physics_key = load_physics_key(cfg)
     device = get_device()
     model = build_model(cfg)
-    model.load_state_dict(torch.load(args.checkpoint, map_location=device))
+    model.load_state_dict(torch.load(args.checkpoint, map_location=device, weights_only=True))
     model = model.to(device)
 
     root = Path(cfg.data.root)
