@@ -22,7 +22,7 @@ from brats_trust.logging_utils import (
     RELIANCE_COLUMNS,
     setup_run,
 )
-from brats_trust.models.scaffold import build_scaffold
+from brats_trust.models.unet3d import build_scaffold
 from brats_trust.pipeline import evaluate_and_log
 
 

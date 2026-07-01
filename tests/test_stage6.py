@@ -7,7 +7,7 @@ from brats_trust.config import load_config
 from brats_trust.data import synthetic
 from brats_trust.engine import apply_modality_dropout
 from brats_trust.metrics.probing import extract_bottleneck_features, linear_probe_modality_presence
-from brats_trust.models.scaffold import build_scaffold
+from brats_trust.models.unet3d import build_scaffold
 
 
 def test_modality_dropout_changes_some_samples_and_keeps_shape():

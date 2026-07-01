@@ -5,7 +5,7 @@ import math
 
 from brats_trust.metrics.erf import measure_erf
 from brats_trust.metrics.faithfulness import faithfulness_score
-from brats_trust.models.scaffold import build_scaffold
+from brats_trust.models.unet3d import build_scaffold
 
 _PHYSICS = {"classes": {
     "WT": {"physics_modality": "FLAIR"},

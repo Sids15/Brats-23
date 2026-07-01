@@ -1,4 +1,4 @@
-"""SegMamba-style 3D segmentation network (roadmap S4/S5, the Mamba/state-space arm).
+"""SegMamba-style 3D segmentation network (roadmap S5) — the Mamba/state-space anchor.
 
 Modeled on SegMamba (Xing et al., 2024): a U-Net-shaped encoder whose stages mix spatial
 context with a Mamba state-space layer (flatten voxels -> sequence -> Mamba -> reshape)
@@ -14,17 +14,13 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from .scaffold import _align_to
+from .base import IN_CHANNELS, OUT_CHANNELS, align_to, norm_act
 
 try:
     from mamba_ssm import Mamba
     _HAS_MAMBA = True
 except ImportError:  # mamba-ssm not installed (e.g. CPU dev box)
     _HAS_MAMBA = False
-
-
-def _norm_act(channels: int) -> nn.Sequential:
-    return nn.Sequential(nn.InstanceNorm3d(channels, affine=True), nn.LeakyReLU(0.01, inplace=True))
 
 
 class MambaLayer(nn.Module):
@@ -47,7 +43,7 @@ class MambaStage(nn.Module):
 
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
-        self.conv = nn.Sequential(nn.Conv3d(in_ch, out_ch, 3, padding=1, bias=False), *_norm_act(out_ch))
+        self.conv = nn.Sequential(nn.Conv3d(in_ch, out_ch, 3, padding=1, bias=False), *norm_act(out_ch))
         self.mamba = MambaLayer(out_ch)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -58,8 +54,8 @@ class _ConvBlock(nn.Module):
     def __init__(self, in_ch: int, out_ch: int) -> None:
         super().__init__()
         self.net = nn.Sequential(
-            nn.Conv3d(in_ch, out_ch, 3, padding=1, bias=False), *_norm_act(out_ch),
-            nn.Conv3d(out_ch, out_ch, 3, padding=1, bias=False), *_norm_act(out_ch),
+            nn.Conv3d(in_ch, out_ch, 3, padding=1, bias=False), *norm_act(out_ch),
+            nn.Conv3d(out_ch, out_ch, 3, padding=1, bias=False), *norm_act(out_ch),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -69,7 +65,7 @@ class _ConvBlock(nn.Module):
 class SegMamba(nn.Module):
     """U-Net with Mamba-mixing encoder stages and a convolutional decoder."""
 
-    def __init__(self, in_channels: int = 4, out_channels: int = 3,
+    def __init__(self, in_channels: int = IN_CHANNELS, out_channels: int = OUT_CHANNELS,
                  features: tuple[int, ...] = (32, 64, 128, 256)) -> None:
         super().__init__()
         self.encoders = nn.ModuleList()
@@ -98,12 +94,12 @@ class SegMamba(nn.Module):
         x = self.bottleneck(x)
         for upconv, dec, skip in zip(self.upconvs, self.decoders, reversed(skips)):
             x = upconv(x)
-            x = _align_to(x, skip)
+            x = align_to(x, skip)
             x = dec(torch.cat([x, skip], dim=1))
         return self.head(x)
 
 
-def build_segmamba(in_channels: int = 4, out_channels: int = 3,
+def build_segmamba(in_channels: int = IN_CHANNELS, out_channels: int = OUT_CHANNELS,
                    features: tuple[int, ...] = (32, 64, 128, 256)) -> SegMamba:
     """Construct SegMamba; raises if mamba-ssm isn't installed (CPU dev box)."""
     if not _HAS_MAMBA:
@@ -112,3 +108,8 @@ def build_segmamba(in_channels: int = 4, out_channels: int = 3,
             "(requires a CUDA build). Run it on the GPU machine."
         )
     return SegMamba(in_channels, out_channels, tuple(features))
+
+
+def build(cfg) -> nn.Module:
+    """Build SegMamba from a config (the ``segmamba`` entry in the model registry)."""
+    return build_segmamba(features=tuple(cfg.model.features))
