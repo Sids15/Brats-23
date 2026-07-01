@@ -14,8 +14,8 @@ process. Read this before contributing.
 - Current dev tooling: `pyyaml`, `pytest`, `ruff`.
 
 ## 2. Naming
-- **Cross-check every data/entity name against the canonical directory listing**
-  `C:\Users\Kensyi15\Downloads\dir.md` before using it (BraTS case ids, modality
+- **Cross-check every data/entity name against the canonical dataset directory listing**
+  (the maintainer's local `dir.md`) before using it (BraTS case ids, modality
   suffixes `t1c/t1n/t2f/t2w/seg`, etc.).
 - The channel order `[FLAIR, T1, T1CE, T2]` and label/region definitions are **frozen**
   in `src/brats_trust/constants.py`. Index modalities by position; never reorder.

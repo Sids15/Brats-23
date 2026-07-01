@@ -32,3 +32,6 @@ desktop.ini
 .idea/
 .vscode/
 .ipynb_checkpoints/
+
+# Local agent/tooling config (may reference vendor names; keep out of history)
+.claude/
