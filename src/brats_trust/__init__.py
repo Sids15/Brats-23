@@ -1,9 +1,9 @@
 """BraTS-Trust: intervention-based conditional modality-reliance measurement
 for 3D brain-tumor segmentation (roadmap: brain_tumor_roadmap_v4_final.md).
 
-Skeleton stage: constants, config, and the physics key are implemented; data /
-models / metrics are interface stubs to be filled per the staged build order
-(roadmap S12).
+Implements the staged build order (roadmap S12): data pipeline, shared model
+scaffold with MONAI anchors, and the measurement stack (conditional reliance,
+comparative fragility, ERF, faithfulness, statistics, XAI checks).
 """
 from __future__ import annotations
 

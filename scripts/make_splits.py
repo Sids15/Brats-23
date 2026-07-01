@@ -2,8 +2,8 @@
 
     python scripts/make_splits.py --config configs/default.yaml
 
-STUB wiring: parses config + calls brats_trust.data.splits.make_splits once the
-split logic lands in Stage 0.
+Parses the config and calls brats_trust.data.splits.make_splits to write the
+patient-level, leakage-free splits to disk.
 """
 from __future__ import annotations
 
