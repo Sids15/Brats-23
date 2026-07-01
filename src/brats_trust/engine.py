@@ -161,9 +161,11 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
             bar.set_postfix(loss=f"{running_loss / (step + 1):.4f}")
             if log_every and (step + 1) % log_every == 0:
                 its = (step + 1) / max(1e-9, time.time() - epoch_start)
+                # File-only (no_console): the live bar already shows step/loss/it-s in the
+                # terminal; this keeps the granular trace in run.log without fighting the bar.
                 ctx.logger.info("    epoch %d/%d  step %d/%d  loss=%.4f  %.2f it/s",
                                 epoch + 1, epochs, step + 1, steps_per_epoch,
-                                running_loss / (step + 1), its)
+                                running_loss / (step + 1), its, extra={"no_console": True})
         bar.close()
 
         epoch_time = time.time() - epoch_start

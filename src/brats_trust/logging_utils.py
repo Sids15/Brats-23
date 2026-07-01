@@ -343,6 +343,10 @@ class _TqdmLoggingHandler(logging.StreamHandler):
     progress bar. Falls back to a plain write when tqdm isn't installed or no bar is live."""
 
     def emit(self, record: logging.LogRecord) -> None:
+        # Records flagged ``no_console`` (e.g. per-step lines) go to run.log only, so the
+        # live progress bar stays the single source of per-step info in the terminal.
+        if getattr(record, "no_console", False):
+            return
         try:
             msg = self.format(record)
             try:
