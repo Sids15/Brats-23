@@ -32,7 +32,7 @@ regions:                # overlapping output channels (roadmap S9)
   ET: [3]
 
 model:
-  name: "unet3d"            # shared scaffold (models/scaffold.py)
+  name: "unet3d"            # shared scaffold (models/unet3d.py)
   block: "conv"             # pluggable block: conv | dwsep (RF probe, S4)
   features: [32, 64, 128, 256]
   kernel_size: 3

@@ -10,7 +10,7 @@ from brats_trust.aggregate import (
 )
 from brats_trust.config import load_physics_key
 from brats_trust.metrics.xai import msfi_score, saliency_map, xai_fails_check
-from brats_trust.models.scaffold import build_scaffold
+from brats_trust.models.unet3d import build_scaffold
 
 
 def test_saliency_and_xai_check_shapes():

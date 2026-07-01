@@ -1,7 +1,6 @@
 # Mirror of pyproject.toml [project].dependencies for quick `pip install -r`.
 # On the training machine, install torch first per https://pytorch.org for the
 # correct CUDA build, then `pip install -r requirements.txt`.
-torch>=2.2
 monai>=1.3
 nibabel>=5.2
 numpy>=1.26
@@ -15,6 +14,6 @@ tqdm>=4.66
 einops>=0.7
 
 # Optional extras:
-# grad-cam>=1.5   # XAI-fails check (roadmap S3.4)
-# pytest>=8.0     # tests
-# ruff>=0.5       # lint
+grad-cam>=1.5   # XAI-fails check (roadmap S3.4)
+pytest>=8.0     # tests
+ruff>=0.5       # lint

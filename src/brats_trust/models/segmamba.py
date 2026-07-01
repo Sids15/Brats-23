@@ -14,7 +14,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from .scaffold import _align_to
+from .base import _align_to
 
 try:
     from mamba_ssm import Mamba

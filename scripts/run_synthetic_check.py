@@ -25,7 +25,7 @@ from brats_trust.data import splits, synthetic
 from brats_trust.data.dataset import make_dataloader
 from brats_trust.engine import train_model
 from brats_trust.logging_utils import setup_run
-from brats_trust.models.scaffold import build_scaffold
+from brats_trust.models.unet3d import build_scaffold
 from brats_trust.pipeline import evaluate_and_log
 
 # Plant ET (label 3) in T1CE (channel 2) and edema (label 2) in FLAIR (channel 0).
