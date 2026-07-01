@@ -343,10 +343,7 @@ def _build_logger(name: str, log_path: Path) -> logging.Logger:
     logger.setLevel(logging.INFO)
     logger.propagate = False
     logger.handlers.clear()
-    fmt = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)-7s | %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S%z",
-    )
+    fmt = logging.Formatter("%(asctime)s  %(levelname)-7s %(message)s")
     file_handler = logging.FileHandler(log_path, encoding="utf-8")
     file_handler.setFormatter(fmt)
     stream_handler = logging.StreamHandler(sys.stdout)
