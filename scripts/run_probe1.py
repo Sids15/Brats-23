@@ -15,6 +15,7 @@ never 'causes'.
 from __future__ import annotations
 
 import argparse
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -84,20 +85,25 @@ def main() -> None:
     val_dirs = [root / c for c in sp["val"]]
     eval_dirs = [root / c for c in (sp["val"] + sp["test"])]
 
-    rows = []
-    for name in models:
-        cfg.model.name = name
-        for seed in seeds:
-            try:
-                rows.append(run_single(cfg, f"probe1_{name}_seed{seed}", train_dirs, val_dirs,
-                                       eval_dirs, physics_key, device=device, base_dir=base,
-                                       epochs=epochs, seed=seed))
-            except ImportError as e:  # e.g. segmamba without mamba-ssm
-                print(f"SKIP {name}: {e}")
+    try:
+        rows = []
+        for name in models:
+            cfg.model.name = name
+            for seed in seeds:
+                try:
+                    rows.append(run_single(cfg, f"probe1_{name}_seed{seed}", train_dirs, val_dirs,
+                                           eval_dirs, physics_key, device=device, base_dir=base,
+                                           epochs=epochs, seed=seed))
+                except ImportError as e:  # e.g. segmamba without mamba-ssm
+                    print(f"SKIP {name}: {e}")
 
-    out_dir = Path(args.out)
-    write_tidy(out_dir / "probe1_summary", rows, PROBE1_COLUMNS)
-    print(f"wrote {len(rows)} runs -> {out_dir / 'probe1_summary.csv'}")
+        out_dir = Path(args.out)
+        write_tidy(out_dir / "probe1_summary", rows, PROBE1_COLUMNS)
+        print(f"wrote {len(rows)} runs -> {out_dir / 'probe1_summary.csv'}")
+    finally:
+        # Smoke data + intermediate run dirs live under a temp base; results are in --out.
+        if args.smoke:
+            shutil.rmtree(base, ignore_errors=True)
 
 
 if __name__ == "__main__":

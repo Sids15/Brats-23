@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -73,22 +74,27 @@ def main() -> None:
         return run_single(cfg, f"fix_{label}_seed{args.seed}", train_dirs, val_dirs, eval_dirs,
                           physics_key, device=device, base_dir=base, epochs=epochs, seed=args.seed)
 
-    cfg.train.modality_dropout.enabled = False
-    baseline = go("baseline")
-    cfg.train.modality_dropout.enabled = True
-    fixed = go("dropout")
+    try:
+        cfg.train.modality_dropout.enabled = False
+        baseline = go("baseline")
+        cfg.train.modality_dropout.enabled = True
+        fixed = go("dropout")
 
-    comparison = {
-        "baseline": baseline, "fixed": fixed,
-        "delta_faithfulness": fixed["faithfulness_overall"] - baseline["faithfulness_overall"],
-        "delta_val_dice": fixed["val_dice"] - baseline["val_dice"],
-    }
-    out_dir = Path(args.out)
-    write_tidy(out_dir / "fix_runs", [baseline, fixed])
-    write_json(out_dir / "fix_comparison.json", comparison)
-    print(json.dumps({k: comparison[k] for k in ("delta_faithfulness", "delta_val_dice")}, indent=2))
-    print("Evidence (S6): want delta_faithfulness > 0 with delta_val_dice ~>= 0; "
-          "also check the fragility gap via scripts/aggregate.py on the two run sets.")
+        comparison = {
+            "baseline": baseline, "fixed": fixed,
+            "delta_faithfulness": fixed["faithfulness_overall"] - baseline["faithfulness_overall"],
+            "delta_val_dice": fixed["val_dice"] - baseline["val_dice"],
+        }
+        out_dir = Path(args.out)
+        write_tidy(out_dir / "fix_runs", [baseline, fixed])
+        write_json(out_dir / "fix_comparison.json", comparison)
+        print(json.dumps({k: comparison[k] for k in ("delta_faithfulness", "delta_val_dice")}, indent=2))
+        print("Evidence (S6): want delta_faithfulness > 0 with delta_val_dice ~>= 0; "
+              "also check the fragility gap via scripts/aggregate.py on the two run sets.")
+    finally:
+        # Smoke data + intermediate run dirs live under a temp base; results are in --out.
+        if args.smoke:
+            shutil.rmtree(base, ignore_errors=True)
 
 
 if __name__ == "__main__":

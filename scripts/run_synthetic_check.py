@@ -14,6 +14,7 @@ Runs end-to-end on CPU; no real dataset required.
 from __future__ import annotations
 
 import argparse
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -56,38 +57,45 @@ def main() -> int:
 
     cfg = build_tiny_cfg()
     device = torch.device("cpu")
+    created_tmp = args.workdir is None
     tmp = Path(args.workdir) if args.workdir else Path(tempfile.mkdtemp())
-    data_root = tmp / "synthetic_data"
-    synthetic.generate_dataset(
-        data_root, n_cases=args.cases, shape=(32, 32, 32), class_channels=PLANTED, seed=0
-    )
-    sp = splits.make_splits(data_root, {"train": 0.6, "val": 0.2, "test": 0.2}, seed=0)
-    train_dirs = [data_root / c for c in sp["train"]]
-    eval_dirs = [data_root / c for c in (sp["val"] + sp["test"])]
+    try:
+        data_root = tmp / "synthetic_data"
+        synthetic.generate_dataset(
+            data_root, n_cases=args.cases, shape=(32, 32, 32), class_channels=PLANTED, seed=0
+        )
+        sp = splits.make_splits(data_root, {"train": 0.6, "val": 0.2, "test": 0.2}, seed=0)
+        train_dirs = [data_root / c for c in sp["train"]]
+        eval_dirs = [data_root / c for c in (sp["val"] + sp["test"])]
 
-    train_loader = make_dataloader(train_dirs, cfg, train=True, num_workers=0)
-    val_loader = make_dataloader([data_root / c for c in sp["val"]], cfg, train=False, batch_size=1)
+        train_loader = make_dataloader(train_dirs, cfg, train=True, num_workers=0)
+        val_loader = make_dataloader([data_root / c for c in sp["val"]], cfg, train=False, batch_size=1)
 
-    model = build_scaffold(block=cfg.model.block, features=cfg.model.features)
-    ctx = setup_run("synthetic_check", cfg, base_dir=tmp / "runs", set_global_seed=0)
-    train_model(model, train_loader, val_loader, cfg, ctx, device=device, max_epochs=args.epochs)
+        model = build_scaffold(block=cfg.model.block, features=cfg.model.features)
+        ctx = setup_run("synthetic_check", cfg, base_dir=tmp / "runs", set_global_seed=0)
+        train_model(model, train_loader, val_loader, cfg, ctx, device=device, max_epochs=args.epochs)
 
-    summary = evaluate_and_log(
-        model, eval_dirs, cfg, ctx, device=device, physics_key=load_physics_key(cfg)
-    )
-    ctx.finalize()
+        summary = evaluate_and_log(
+            model, eval_dirs, cfg, ctx, device=device, physics_key=load_physics_key(cfg)
+        )
+        ctx.finalize()
 
-    # Did the metric recover the planted reliance?
-    et_rows = [r for r in summary["reliance_matrix"] if r["region"] == DESIGNATED_REGION]
-    top = max(et_rows, key=lambda r: r["score"])
-    print("\nReliance for", DESIGNATED_REGION, "(higher = more relied on):")
-    for r in sorted(et_rows, key=lambda r: -r["score"]):
-        print(f"  {r['modality']:5} score={r['score']:.3f}  CI[{r['ci_low']:.3f},{r['ci_high']:.3f}]")
-    passed = top["modality"] == DESIGNATED_MODALITY
-    print(f"\n{'PASS' if passed else 'FAIL'}: {DESIGNATED_REGION} top reliance = "
-          f"{top['modality']} (expected {DESIGNATED_MODALITY})")
-    print("results:", ctx.run_dir / "results")
-    return 0 if passed else 1
+        # Did the metric recover the planted reliance?
+        et_rows = [r for r in summary["reliance_matrix"] if r["region"] == DESIGNATED_REGION]
+        top = max(et_rows, key=lambda r: r["score"])
+        print("\nReliance for", DESIGNATED_REGION, "(higher = more relied on):")
+        for r in sorted(et_rows, key=lambda r: -r["score"]):
+            print(f"  {r['modality']:5} score={r['score']:.3f}  CI[{r['ci_low']:.3f},{r['ci_high']:.3f}]")
+        passed = top["modality"] == DESIGNATED_MODALITY
+        print(f"\n{'PASS' if passed else 'FAIL'}: {DESIGNATED_REGION} top reliance = "
+              f"{top['modality']} (expected {DESIGNATED_MODALITY})")
+        if not created_tmp:
+            print("results:", ctx.run_dir / "results")
+        return 0 if passed else 1
+    finally:
+        # Only remove the working dir if we created it; respect a user-supplied --workdir.
+        if created_tmp:
+            shutil.rmtree(tmp, ignore_errors=True)
 
 
 if __name__ == "__main__":
