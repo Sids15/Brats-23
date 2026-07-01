@@ -229,6 +229,28 @@ class MetricLogger:
 
 
 # --------------------------------------------------------------------------- #
+# Console/log formatting
+# --------------------------------------------------------------------------- #
+def log_banner(
+    logger: logging.Logger, title: str, fields: dict[str, Any] | None = None, width: int = 60
+) -> None:
+    """Log a boxed title (and an aligned key/value block) through the run logger.
+
+    Emitted line-by-line via ``logger`` so it lands in both the console and ``run.log``
+    with timestamps -- a scannable, paper-ready header of what a run was configured with.
+    """
+    bar = "=" * width
+    logger.info(bar)
+    logger.info(title)
+    logger.info(bar)
+    if fields:
+        key_width = max(len(k) for k in fields)
+        for key, value in fields.items():
+            logger.info("  %-*s  %s", key_width + 1, f"{key}:", value)
+        logger.info(bar)
+
+
+# --------------------------------------------------------------------------- #
 # Tidy result writers (paper tables/figures source of truth)
 # --------------------------------------------------------------------------- #
 def write_json(path: Path, obj: Any) -> Path:

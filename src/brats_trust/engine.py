@@ -15,6 +15,7 @@ from torch import nn
 from tqdm import tqdm
 
 from .constants import REGION_ORDER
+from .logging_utils import log_banner
 from .metrics.segmentation import compute_case_metrics, postprocess
 
 
@@ -117,12 +118,21 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
     md_prob = float(getattr(md, "prob", 0.25)) if md_enabled else 0.0
 
     n_params = sum(p.numel() for p in model.parameters())
-    ctx.logger.info(
-        "training: device=%s amp=%s params=%.2fM epochs=%d steps/epoch=%d batch=%s patch=%s lr=%g md=%s",
-        device, use_amp, n_params / 1e6, epochs, steps_per_epoch, cfg.train.batch_size,
-        list(cfg.train.patch_size), cfg.train.lr,
-        f"on@epoch{md_start}(p={md_prob})" if md_enabled else "off",
-    )
+    log_banner(ctx.logger, "BraTS-Trust training", {
+        "Run": ctx.name,
+        "Device": device,
+        "AMP": "enabled" if use_amp else "disabled",
+        "Model": f"{cfg.model.name} / {cfg.model.block} block, kernel {cfg.model.kernel_size}",
+        "Params": f"{n_params / 1e6:.2f}M",
+        "Epochs": epochs,
+        "Steps/epoch": steps_per_epoch,
+        "Batch size": cfg.train.batch_size,
+        "Patch size": list(cfg.train.patch_size),
+        "LR": cfg.train.lr,
+        "Val every": f"{cfg.train.val_interval} epochs",
+        "Log every": f"{log_every} steps" if log_every else "off",
+        "Modality dropout": f"on @ epoch {md_start} (p={md_prob})" if md_enabled else "off",
+    })
 
     best_dice = 0.0
     epoch_times: list[float] = []
