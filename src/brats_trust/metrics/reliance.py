@@ -8,8 +8,9 @@ reliance matrix.
 Honest proxy (roadmap S1): this approximates the conditional/unique-information
 quantity; the rigorous conditional-MI / PID version is the Fork-B project (S10).
 
-STUB: interface only. Implement in Stage 0 and unit-test against the synthetic
-sanity check (S3.5) before trusting it on real MRI.
+Validated against the synthetic sanity check (S3.5, ``scripts/run_synthetic_check.py``),
+which confirms the metric recovers a planted modality→class coupling before it is
+trusted on real MRI.
 """
 from __future__ import annotations
 

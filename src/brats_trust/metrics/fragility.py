@@ -10,11 +10,41 @@ does not prove wrongness -- the leaned-on-vs-physics-correct *gap* is the eviden
 """
 from __future__ import annotations
 
+import math
 from collections import defaultdict
 
 from ..constants import CHANNEL_ORDER, REGION_ORDER
 from .reliance import _load_case, intervene_tensor
 from .stats import bootstrap_ci
+
+
+def _summarize_drop(full_vals: list[float], drop_vals: list[float]) -> dict:
+    """Aggregate one (region, removed-modality) cell across cases, NaN-safely.
+
+    Empty-GT regions yield NaN per-case Dice by BraTS convention (MONAI's
+    ``ignore_empty``); those cases carry no fragility information, so we drop the pair
+    rather than let a single NaN poison the region's mean. Returns the mean full/dropped
+    Dice, the mean drop (``delta``), a bootstrap CI on the drop, and ``n_cases`` (how many
+    defined-reference cases contributed) -- reported so the paper isn't averaging over a
+    silently-subset denominator. All-NaN (no defined case) yields NaNs with ``n_cases`` 0.
+    """
+    pairs = [(f, d) for f, d in zip(full_vals, drop_vals) if math.isfinite(f) and math.isfinite(d)]
+    if not pairs:
+        nan = float("nan")
+        return {"dice_full": nan, "dice_dropped": nan, "delta": nan,
+                "ci_low": nan, "ci_high": nan, "n_cases": 0}
+    fulls = [f for f, _ in pairs]
+    drops = [d for _, d in pairs]
+    deltas = [f - d for f, d in pairs]
+    ci_low, ci_high = bootstrap_ci(deltas)
+    return {
+        "dice_full": sum(fulls) / len(fulls),
+        "dice_dropped": sum(drops) / len(drops),
+        "delta": sum(deltas) / len(deltas),
+        "ci_low": ci_low,
+        "ci_high": ci_high,
+        "n_cases": len(pairs),
+    }
 
 
 def _leaned_on_by_region(reliance_rows: list[dict]) -> dict[str, str]:
@@ -41,7 +71,8 @@ def comparative_fragility(
 
     Returns ``FRAGILITY_COLUMNS`` rows: for each region, one row for the ``leaned_on``
     modality and one for the ``physics_correct`` modality, with mean full/dropped Dice,
-    the mean drop (``delta``), and a bootstrap CI on the drop across cases.
+    the mean drop (``delta``), a bootstrap CI on the drop, and ``n_cases`` (defined-
+    reference cases contributing; empty-GT cases are excluded -- see ``_summarize_drop``).
     """
     import torch
 
@@ -75,18 +106,10 @@ def comparative_fragility(
         for role, modality in (("leaned_on", leaned.get(region)), ("physics_correct", physics[region])):
             if modality is None:
                 continue
-            full_vals = full[region]
-            drop_vals = dropped[(region, modality)]
-            deltas = [f - d for f, d in zip(full_vals, drop_vals)]
-            ci_low, ci_high = bootstrap_ci(deltas)
             rows.append({
                 "region": region,
                 "removed_modality": modality,
                 "role": role,
-                "dice_full": sum(full_vals) / len(full_vals),
-                "dice_dropped": sum(drop_vals) / len(drop_vals),
-                "delta": sum(deltas) / len(deltas),
-                "ci_low": ci_low,
-                "ci_high": ci_high,
+                **_summarize_drop(full[region], dropped[(region, modality)]),
             })
     return rows

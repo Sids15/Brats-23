@@ -35,7 +35,7 @@ def main() -> None:
 
     device = get_device()
     model = build_model(cfg)
-    model.load_state_dict(torch.load(args.checkpoint, map_location=device))
+    model.load_state_dict(torch.load(args.checkpoint, map_location=device, weights_only=True))
 
     ctx = setup_run(args.name, cfg)
     ctx.logger.info("evaluating %d %s cases on %s", len(case_dirs), args.split, device)

@@ -10,8 +10,10 @@ carried by the modality that physically images that class — and that mismatch
 can be measured, characterized across receptive-field conditions, and shown to
 have a consequence.
 
-> Status: **skeleton**. Config, constants, and the physics key are real; data /
-> models / metrics are interface stubs. See "Build order" below.
+> Status: Stages 0–1 complete and verified on GPU — the full test suite passes,
+> dataset preflight is clean on all 1251 cases, and the real-data pipeline smoke
+> (train → inference → reliance → fragility) runs end-to-end. The receptive-field
+> sweep (Stage 2) is next. See "Build order" below.
 
 ## Dataset
 
@@ -39,11 +41,11 @@ src/brats_trust/
   constants.py                # frozen channel order, labels, regions
   config.py                   # YAML loader w/ deep-merge overrides
   physics_answer_key.json     # documents physics expectation; NEVER a penalty
-  data/   splits, dataset (ablation-capable, mean-fill), preprocess  [stubs]
-  models/ shared U-Net scaffold + pluggable block                   [stubs]
-  metrics/ reliance (primary), fragility (consequence)              [stubs]
-scripts/make_splits.py
-tests/test_smoke.py
+  data/    splits, dataset (ablation-capable, mean-fill), preprocess, synthetic
+  models/  shared U-Net scaffold + pluggable block, MONAI anchors (DynUNet/UNETR/Swin)
+  metrics/ reliance (primary), fragility (consequence), ERF, faithfulness, stats, XAI
+scripts/   preflight, train, evaluate, sweeps (probe1/probe3), fix, figures, security_audit
+tests/     full suite: data, metrics, pipeline, architectures, figures, stage4/6, ...
 ```
 
 ## Conventions & docs
@@ -60,7 +62,7 @@ tests/test_smoke.py
 python -m venv .venv && . .venv/Scripts/activate    # Windows Git Bash
 # install torch matching your CUDA from https://pytorch.org first, then:
 pip install -e .
-pytest -q                                            # skeleton smoke tests
+pytest -q                                            # full test suite
 ```
 
 Training target: RTX 4500 Ada (24 GB). `train.amp` is on; `patch_size`

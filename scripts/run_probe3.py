@@ -13,6 +13,7 @@ Smoke test (CPU, synthetic; proves the loop wires up, NOT a scientific result):
 from __future__ import annotations
 
 import argparse
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -85,19 +86,24 @@ def main() -> None:
     val_dirs = [root / c for c in sp["val"]]
     eval_dirs = [root / c for c in (sp["val"] + sp["test"])]
 
-    rows = []
-    for variant in VARIANTS:
-        cfg.model.block = variant["block"]
-        cfg.model.kernel_size = variant["kernel_size"]
-        for seed in seeds:
-            row = run_single(cfg, f"probe3_{variant['name']}_seed{seed}", train_dirs, val_dirs,
-                             eval_dirs, physics_key, device=device, base_dir=base, epochs=epochs, seed=seed)
-            rows.append({"variant": variant["name"], **row})
+    try:
+        rows = []
+        for variant in VARIANTS:
+            cfg.model.block = variant["block"]
+            cfg.model.kernel_size = variant["kernel_size"]
+            for seed in seeds:
+                row = run_single(cfg, f"probe3_{variant['name']}_seed{seed}", train_dirs, val_dirs,
+                                 eval_dirs, physics_key, device=device, base_dir=base, epochs=epochs, seed=seed)
+                rows.append({"variant": variant["name"], **row})
 
-    out_dir = Path(args.out)
-    write_tidy(out_dir / "probe3_summary", rows, PROBE3_COLUMNS)
-    print(f"wrote {len(rows)} runs -> {out_dir / 'probe3_summary.csv'}")
-    print("next: python scripts/analyze_probe3.py --summary", out_dir / "probe3_summary.jsonl")
+        out_dir = Path(args.out)
+        write_tidy(out_dir / "probe3_summary", rows, PROBE3_COLUMNS)
+        print(f"wrote {len(rows)} runs -> {out_dir / 'probe3_summary.csv'}")
+        print("next: python scripts/analyze_probe3.py --summary", out_dir / "probe3_summary.jsonl")
+    finally:
+        # Smoke data + intermediate run dirs live under a temp base; results are in --out.
+        if args.smoke:
+            shutil.rmtree(base, ignore_errors=True)
 
 
 if __name__ == "__main__":
