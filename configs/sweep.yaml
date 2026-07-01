@@ -1,0 +1,11 @@
+# Configuration for the Stage 2 Receptive-Field Sweep.
+# Uses a safe and fast patch size (96^3) and batch size (4) to ensure high GPU throughput
+# and prevent CUDA OOM on the RTX 4500 Ada (24 GB) machine.
+# Deep-merged over configs/default.yaml.
+
+train:
+  patch_size: [96, 96, 96]
+  batch_size: 4
+  max_epochs: 60
+inference:
+  roi_size: [96, 96, 96]
