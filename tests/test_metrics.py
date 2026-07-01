@@ -1,9 +1,11 @@
 """Tests for the torch-free metrics layer: statistics and reliance aggregation."""
 from __future__ import annotations
 
+import math
+
 import numpy as np
 
-from brats_trust.metrics import reliance, stats
+from brats_trust.metrics import fragility, reliance, stats
 
 
 def test_bootstrap_ci_brackets_the_mean():
@@ -56,3 +58,22 @@ def test_aggregate_reliance_groups_and_scores():
     assert by_mod["T1CE"]["score"] > by_mod["FLAIR"]["score"]
     assert all(r["fill"] == "mean" for r in rows)
     assert set(rows[0]) == {"region", "modality", "fill", "score", "ci_low", "ci_high"}
+
+
+def test_summarize_drop_excludes_empty_gt_cases():
+    # An empty-GT case gives NaN Dice (MONAI convention); it must be dropped, not
+    # allowed to poison the region's mean the way plain sum/len did.
+    nan = float("nan")
+    full = [0.9, nan, 0.7]
+    dropped = [0.5, nan, 0.4]
+    out = fragility._summarize_drop(full, dropped)
+    assert out["n_cases"] == 2
+    assert math.isfinite(out["delta"])
+    assert abs(out["delta"] - ((0.9 - 0.5) + (0.7 - 0.4)) / 2) < 1e-9
+    assert abs(out["dice_full"] - 0.8) < 1e-9
+
+
+def test_summarize_drop_all_empty_is_nan_not_crash():
+    out = fragility._summarize_drop([float("nan")], [float("nan")])
+    assert out["n_cases"] == 0
+    assert all(math.isnan(out[k]) for k in ("dice_full", "dice_dropped", "delta"))

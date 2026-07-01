@@ -74,6 +74,7 @@ RELIANCE_COLUMNS = (
 FRAGILITY_COLUMNS = (
     "region", "removed_modality", "role",    # role in {leaned_on, physics_correct}
     "dice_full", "dice_dropped", "delta", "ci_low", "ci_high",
+    "n_cases",                               # defined-reference cases (empty-GT excluded)
 )
 
 
