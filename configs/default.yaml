@@ -46,6 +46,7 @@ train:
   weight_decay: 0.00001
   max_epochs: 300
   val_interval: 5           # run validation every N epochs
+  log_every_steps: 25       # periodic per-step line in run.log/terminal; 0 disables
   amp: true                 # mixed precision (24 GB RTX 4500 Ada target); auto-off on CPU
   num_workers: 8
   modality_dropout:         # roadmap S6 (optional fix): mean-fill a random modality late in training

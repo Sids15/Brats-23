@@ -8,6 +8,7 @@ the scientific reliance result -- that needs real training and lives in
 from __future__ import annotations
 
 import csv
+import json
 
 import torch
 
@@ -59,6 +60,14 @@ def test_end_to_end_pipeline_on_synthetic(tmp_path):
     best = train_model(model, train_loader, val_loader, cfg, ctx, device=device, max_epochs=2)
     assert isinstance(best, float)
     assert (ctx.run_dir / "best_model.pt").exists()
+
+    # Detailed training logs: per-epoch throughput/timing rows + per-region val Dice.
+    metric_rows = [json.loads(x) for x
+                   in (ctx.run_dir / "metrics.jsonl").read_text(encoding="utf-8").splitlines() if x.strip()]
+    train_rows = [r for r in metric_rows if r["split"] == "train"]
+    val_rows = [r for r in metric_rows if r["split"] == "val"]
+    assert train_rows and {"epoch_time_s", "it_per_s", "gpu_mem_gb", "lr"} <= set(train_rows[0])
+    assert val_rows and {"dice_WT", "dice_TC", "dice_ET", "mean_dice"} <= set(val_rows[0])
 
     out = evaluate_and_log(model, eval_dirs, cfg, ctx, device=device, physics_key=load_physics_key())
     ctx.finalize()
