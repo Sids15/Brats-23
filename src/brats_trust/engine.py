@@ -6,12 +6,16 @@ inference uses sliding-window + Gaussian blending (S9).
 """
 from __future__ import annotations
 
+import time
+
 import torch
 from monai.inferers import sliding_window_inference
 from monai.losses import DiceCELoss
 from torch import nn
 from tqdm import tqdm
 
+from .constants import REGION_ORDER
+from .logging_utils import log_banner
 from .metrics.segmentation import compute_case_metrics, postprocess
 
 
@@ -65,18 +69,31 @@ def infer_volume(model: nn.Module, image: torch.Tensor, cfg, device: torch.devic
 
 
 @torch.no_grad()
-def validate(model: nn.Module, loader, cfg, device: torch.device) -> float:
-    """Return mean Dice over all regions/cases (for model selection)."""
+def validate(model: nn.Module, loader, cfg, device: torch.device) -> dict[str, float]:
+    """Per-region and overall validation Dice.
+
+    Returns ``{WT, TC, ET, mean}``; each is NaN-safe (empty-GT regions yield NaN Dice and
+    are dropped before averaging). ``mean`` (over all non-empty region/case values) is the
+    model-selection signal; the per-region values give the training curves the paper needs.
+    """
     model.eval()
-    dices: list[float] = []
+    per_region: dict[str, list[float]] = {r: [] for r in REGION_ORDER}
     for batch in loader:
         logits = infer_volume(model, batch["image"], cfg, device)
         preds = postprocess(logits).cpu()
         labels = batch["label"]
         for pred, label in zip(preds, labels):
-            dices += [r["dice"] for r in compute_case_metrics(pred, label)]
-    valid = [d for d in dices if d == d]  # drop NaN (empty regions)
-    return float(sum(valid) / len(valid)) if valid else 0.0
+            for row in compute_case_metrics(pred, label):
+                per_region[row["region"]].append(row["dice"])
+
+    out: dict[str, float] = {}
+    all_finite: list[float] = []
+    for region, vals in per_region.items():
+        finite = [d for d in vals if d == d]  # drop NaN (empty regions)
+        out[region] = sum(finite) / len(finite) if finite else float("nan")
+        all_finite += finite
+    out["mean"] = sum(all_finite) / len(all_finite) if all_finite else 0.0
+    return out
 
 
 def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epochs=None) -> float:
@@ -91,6 +108,8 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
     use_amp = bool(cfg.train.amp) and device.type == "cuda"
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
     epochs = max_epochs if max_epochs is not None else cfg.train.max_epochs
+    steps_per_epoch = max(1, len(train_loader))
+    log_every = int(getattr(cfg.train, "log_every_steps", 0) or 0)
 
     # Modality-dropout fix (roadmap S6): on for the last (1 - start_frac) of training.
     md = getattr(cfg.train, "modality_dropout", None)
@@ -98,11 +117,33 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
     md_start = int(getattr(md, "start_frac", 0.8) * epochs) if md_enabled else epochs
     md_prob = float(getattr(md, "prob", 0.25)) if md_enabled else 0.0
 
+    n_params = sum(p.numel() for p in model.parameters())
+    log_banner(ctx.logger, "BraTS-Trust training", {
+        "Run": ctx.name,
+        "Device": device,
+        "AMP": "enabled" if use_amp else "disabled",
+        "Model": f"{cfg.model.name} / {cfg.model.block} block, kernel {cfg.model.kernel_size}",
+        "Params": f"{n_params / 1e6:.2f}M",
+        "Epochs": epochs,
+        "Steps/epoch": steps_per_epoch,
+        "Batch size": cfg.train.batch_size,
+        "Patch size": list(cfg.train.patch_size),
+        "LR": cfg.train.lr,
+        "Val every": f"{cfg.train.val_interval} epochs",
+        "Log every": f"{log_every} steps" if log_every else "off",
+        "Modality dropout": f"on @ epoch {md_start} (p={md_prob})" if md_enabled else "off",
+    })
+
     best_dice = 0.0
-    for epoch in tqdm(range(epochs), desc="train", unit="epoch"):
+    epoch_times: list[float] = []
+    for epoch in range(epochs):
         model.train()
-        epoch_loss = 0.0
-        for batch in train_loader:
+        if device.type == "cuda":
+            torch.cuda.reset_peak_memory_stats(device)
+        epoch_start = time.time()
+        running_loss = 0.0
+        bar = tqdm(train_loader, desc=f"epoch {epoch + 1}/{epochs}", unit="step", leave=False)
+        for step, batch in enumerate(bar):
             images = batch["image"].to(device)
             labels = batch["label"].to(device)
             if md_enabled and epoch >= md_start:
@@ -114,14 +155,39 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
-            epoch_loss += loss.item()
-        ctx.metrics.log(step=epoch, split="train", loss=epoch_loss / max(1, len(train_loader)))
+            running_loss += loss.item()
+            avg_loss = running_loss / (step + 1)
+            its = (step + 1) / max(1e-9, time.time() - epoch_start)
+            bar.set_postfix(loss=f"{avg_loss:.4f}", it_s=f"{its:.2f}")
+            if log_every and (step + 1) % log_every == 0:
+                ctx.logger.info("epoch %d/%d step %d/%d | loss %.4f | %.2f it/s",
+                                epoch + 1, epochs, step + 1, steps_per_epoch, avg_loss, its)
+        bar.close()
+
+        epoch_time = time.time() - epoch_start
+        epoch_times.append(epoch_time)
+        train_loss = running_loss / steps_per_epoch
+        its = steps_per_epoch / max(1e-9, epoch_time)
+        gpu_gb = torch.cuda.max_memory_allocated(device) / 1024**3 if device.type == "cuda" else 0.0
+        lr = optimizer.param_groups[0]["lr"]
+        eta_h = (sum(epoch_times) / len(epoch_times)) * (epochs - epoch - 1) / 3600.0
+        ctx.metrics.log(step=epoch, split="train", loss=train_loss, epoch_time_s=round(epoch_time, 2),
+                        it_per_s=round(its, 3), gpu_mem_gb=round(gpu_gb, 3), lr=lr,
+                        eta_hours=round(eta_h, 3))
+        ctx.logger.info("epoch %d/%d | loss %.4f | %.2f it/s | %.1fs | GPU %.2fGiB | lr %g | ETA %.2fh",
+                        epoch + 1, epochs, train_loss, its, epoch_time, gpu_gb, lr, eta_h)
 
         if (epoch + 1) % cfg.train.val_interval == 0 or epoch == epochs - 1:
             dice = validate(model, val_loader, cfg, device)
-            ctx.metrics.log(step=epoch, split="val", mean_dice=dice)
-            ctx.logger.info("epoch %d | val mean Dice %.4f", epoch, dice)
-            if dice >= best_dice:
-                best_dice = dice
+            improved = dice["mean"] >= best_dice
+            ctx.metrics.log(step=epoch, split="val", dice_WT=dice["WT"], dice_TC=dice["TC"],
+                            dice_ET=dice["ET"], mean_dice=dice["mean"])
+            if improved:
+                best_dice = dice["mean"]
                 torch.save(model.state_dict(), ctx.run_dir / "best_model.pt")
+            ctx.logger.info(
+                "epoch %d/%d | val Dice WT %.3f TC %.3f ET %.3f | mean %.4f | best %.4f%s",
+                epoch + 1, epochs, dice["WT"], dice["TC"], dice["ET"], dice["mean"], best_dice,
+                " *saved" if improved else "",
+            )
     return best_dice
