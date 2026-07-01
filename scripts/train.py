@@ -36,9 +36,17 @@ def main() -> None:
     ap.add_argument("--epochs", type=int, default=None, help="Override max_epochs.")
     ap.add_argument("--limit", type=int, default=None,
                     help="Cap #cases for a fast pipeline smoke (train=limit, val=limit//4).")
+    ap.add_argument("--batch-size", type=int, default=None, help="Override training batch size.")
+    ap.add_argument("--patch", type=int, default=None, help="Override patch size (as a single cubic dimension).")
     args = ap.parse_args()
 
     cfg = load_config(args.config) if args.config else load_config()
+    if args.batch_size:
+        cfg.train.batch_size = args.batch_size
+    if args.patch:
+        cfg.train.patch_size = [args.patch, args.patch, args.patch]
+        cfg.inference.roi_size = [args.patch, args.patch, args.patch]
+
     root, sp = resolve_splits(cfg)
     train_dirs = [root / c for c in sp["train"]]
     val_dirs = [root / c for c in sp["val"]]
