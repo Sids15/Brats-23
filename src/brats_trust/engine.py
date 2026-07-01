@@ -6,12 +6,14 @@ inference uses sliding-window + Gaussian blending (S9).
 """
 from __future__ import annotations
 
+import sys
 import time
 
 import torch
 from monai.inferers import sliding_window_inference
 from monai.losses import DiceCELoss
 from torch import nn
+from tqdm import tqdm
 
 from .constants import REGION_ORDER
 from .logging_utils import log_banner
@@ -141,7 +143,9 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
             torch.cuda.reset_peak_memory_stats(device)
         epoch_start = time.time()
         running_loss = 0.0
-        for step, batch in enumerate(train_loader):
+        bar = tqdm(train_loader, desc=f"epoch {epoch + 1}/{epochs}", unit="step",
+                   leave=False, file=sys.stdout, dynamic_ncols=True)
+        for step, batch in enumerate(bar):
             images = batch["image"].to(device)
             labels = batch["label"].to(device)
             if md_enabled and epoch >= md_start:
@@ -154,11 +158,13 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
             scaler.step(optimizer)
             scaler.update()
             running_loss += loss.item()
+            bar.set_postfix(loss=f"{running_loss / (step + 1):.4f}")
             if log_every and (step + 1) % log_every == 0:
                 its = (step + 1) / max(1e-9, time.time() - epoch_start)
                 ctx.logger.info("    epoch %d/%d  step %d/%d  loss=%.4f  %.2f it/s",
                                 epoch + 1, epochs, step + 1, steps_per_epoch,
                                 running_loss / (step + 1), its)
+        bar.close()
 
         epoch_time = time.time() - epoch_start
         epoch_times.append(epoch_time)
