@@ -6,6 +6,8 @@ the per-run logic and recorded columns are identical.
 """
 from __future__ import annotations
 
+import torch
+
 from .data.dataset import make_dataloader
 from .engine import get_device, train_model
 from .logging_utils import setup_run

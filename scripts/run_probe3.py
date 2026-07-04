@@ -29,7 +29,7 @@ from brats_trust.logging_utils import write_tidy
 # RF variants: small -> large. Depthwise-separable keeps params modest as the kernel grows,
 # so receptive field is the dominant thing that changes (roadmap S4 Probe 3).
 VARIANTS = [
-    {"name": "rf_small", "block": "conv", "kernel_size": 3},
+    # {"name": "rf_small", "block": "conv", "kernel_size": 3},
     {"name": "rf_med", "block": "dwsep", "kernel_size": 5},
     {"name": "rf_large", "block": "dwsep", "kernel_size": 7},
 ]
