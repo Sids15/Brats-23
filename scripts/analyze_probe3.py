@@ -53,11 +53,35 @@ def main() -> None:
     ax.set_ylabel("Faithfulness (reliance share on physics modality)")
     ax.set_title(f"ERF vs faithfulness  (Spearman rho={rho:.2f}, p={pval:.3g}, n={erf.size})")
     ax.legend()
-    fig.tight_layout()
+    
+    # Summary table
+    table_data = []
+    for v in variants:
+        idx = [i for i, r in enumerate(np.array(rows)[mask]) if r["variant"] == v]
+        v_erf = np.mean(erf[idx])
+        v_faith = np.mean(faith[idx])
+        v_dice = np.mean([r.get("val_dice", 0.0) for r in np.array(rows)[mask][idx]])
+        table_data.append([v, f"{v_erf:.1f}", f"{v_faith:.3f}", f"{v_dice:.3f}"])
+    
+    table = ax.table(cellText=table_data, colLabels=["Variant", "ERF", "Faith", "ValDice"],
+                     loc="bottom", bbox=[0.0, -0.4, 1.0, 0.25])
+    table.auto_set_font_size(False)
+    table.set_fontsize(8)
+    plt.subplots_adjust(bottom=0.35)
+    
     fig.savefig(out_dir / "erf_vs_faithfulness.png", dpi=150)
 
     print(json.dumps(stats, indent=2))
     print("figure ->", out_dir / "erf_vs_faithfulness.png")
+
+    print("\n" + "="*70)
+    if rho < 0:
+        print(f"DECISIVE RESULT: NEGATIVE CORRELATION (rho={rho:.2f}, p={pval:.3g})")
+        print("-> Trend matches hypothesis. Proceed to full 5-seed confirmatory run.")
+    elif rho >= 0:
+        print(f"DECISIVE RESULT: NO/POSITIVE CORRELATION (rho={rho:.2f}, p={pval:.3g})")
+        print("-> Trend absent or unexpected. Needs full 5-seed run to confirm null.")
+    print("="*70 + "\n")
 
 
 if __name__ == "__main__":

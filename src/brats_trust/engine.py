@@ -92,7 +92,7 @@ def validate(model: nn.Module, loader, cfg, device: torch.device) -> dict[str, f
         finite = [d for d in vals if d == d]  # drop NaN (empty regions)
         out[region] = sum(finite) / len(finite) if finite else float("nan")
         all_finite += finite
-    out["mean"] = sum(all_finite) / len(all_finite) if all_finite else 0.0
+    out["mean"] = sum(all_finite) / len(all_finite) if all_finite else float("nan")
     return out
 
 
@@ -195,4 +195,6 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
                 epoch + 1, epochs, dice["WT"], dice["TC"], dice["ET"], dice["mean"], best_dice,
                 " *saved" if improved else "",
             )
+            if device.type == "cuda":
+                torch.cuda.empty_cache()
     return best_dice

@@ -56,4 +56,8 @@ def measure_erf(
         if total <= 0:
             continue
         radii.append(float(torch.sqrt((weight * dist2_t).sum() / total)))
+        model.zero_grad()
+        del x, out, weight
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
     return float(np.mean(radii)) if radii else float("nan")
