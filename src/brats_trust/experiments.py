@@ -37,7 +37,7 @@ def run_single(cfg, run_name, train_dirs, val_dirs, eval_dirs, physics_key,
     val_loader = make_dataloader(val_dirs, cfg, train=False, batch_size=1)
     model = build_model(cfg)
 
-    ctx = setup_run(run_name, cfg, base_dir=base_dir, set_global_seed=seed)
+    ctx = setup_run(run_name, cfg, base_dir=base_dir, set_global_seed=seed, resume=True)
     val_dice = train_model(model, train_loader, val_loader, cfg, ctx, device=device, max_epochs=epochs)
     out = evaluate_and_log(model, eval_dirs, cfg, ctx, device=device, physics_key=physics_key)
     if device.type == "cuda":

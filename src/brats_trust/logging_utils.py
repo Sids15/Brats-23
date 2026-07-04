@@ -381,8 +381,9 @@ def setup_run(
     base_dir: str | Path = "runs",
     seeds: dict[str, Any] | None = None,
     set_global_seed: int | None = None,
+    resume: bool = False,
 ) -> RunContext:
-    """Create a timestamped run directory and return a ready-to-use :class:`RunContext`.
+    """Create a run directory and return a ready-to-use :class:`RunContext`
 
     Writes ``config.yaml`` (resolved snapshot) and ``env.json`` immediately, so even a
     run that crashes in epoch 0 leaves a complete reproducibility record.
@@ -398,8 +399,11 @@ def setup_run(
         set_seed(set_global_seed)
         seeds = {**(seeds or {}), "seed": set_global_seed}
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run_dir = Path(base_dir) / f"{timestamp}__{name}"
+    if resume:
+        run_dir = Path(base_dir) / name
+    else:
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        run_dir = Path(base_dir) / f"{timestamp}__{name}"
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "results").mkdir(exist_ok=True)
 
