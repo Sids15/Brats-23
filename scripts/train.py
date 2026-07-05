@@ -43,9 +43,9 @@ def main() -> None:
     args = ap.parse_args()
 
     cfg = load_config(args.config) if args.config else load_config()
-    if args.batch_size:
+    if args.batch_size is not None:
         cfg.train.batch_size = args.batch_size
-    if args.patch:
+    if args.patch is not None:
         cfg.train.patch_size = [args.patch] * 3
         cfg.inference.roi_size = [args.patch] * 3
     root, sp = resolve_splits(cfg)
