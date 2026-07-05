@@ -32,12 +32,13 @@ _BUILDERS = {
     ),
 }
 
+# Public registry of the architectures the matched protocol trains (Probe 1 / Tier-A).
+MODELS = tuple(_BUILDERS)
+
 
 def build_model(cfg) -> nn.Module:
     """Build the architecture named by ``cfg.model.name`` under the matched protocol."""
     name = cfg.model.name
     if name not in _BUILDERS:
-        raise ValueError(
-            f"unknown model name {name!r}; choose from {sorted(_BUILDERS)}"
-        )
+        raise ValueError(f"unknown model name {name!r}; choose from {list(MODELS)}")
     return _BUILDERS[name](cfg)

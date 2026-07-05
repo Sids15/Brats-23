@@ -42,7 +42,7 @@ src/brats_trust/
   config.py                   # YAML loader w/ deep-merge overrides
   physics_answer_key.json     # documents physics expectation; NEVER a penalty
   data/    splits, dataset (ablation-capable, mean-fill), preprocess, synthetic
-  models/  shared U-Net scaffold + pluggable block, MONAI anchors (DynUNet/UNETR/Swin)
+  models/  base + one module per architecture: unet3d (scaffold/RF-sweep), dynunet, unetr, swin_unetr, segmamba
   metrics/ reliance (primary), fragility (consequence), ERF, faithfulness, stats, XAI
 scripts/   preflight, train, evaluate, sweeps (probe1/probe3), fix, figures, security_audit
 tests/     full suite: data, metrics, pipeline, architectures, figures, stage4/6, ...
@@ -53,6 +53,8 @@ tests/     full suite: data, metrics, pipeline, architectures, figures, stage4/6
 - [`rules.md`](./rules.md) — operating rules (env, naming, logging, git, security).
 - [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — system architecture + run-dir schema
   (also seeds the paper's Methods/Reproducibility sections).
+- [`docs/PIPELINE.md`](./docs/PIPELINE.md) — end-to-end pipeline diagram + Methods prose
+  (preprocess → splits → matched-protocol training → metrics → figures).
 - [`docs/RUNBOOK.md`](./docs/RUNBOOK.md) — stage-by-stage commands, expected results, and
   what to send back if a result looks wrong.
 
