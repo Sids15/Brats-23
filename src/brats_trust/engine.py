@@ -6,6 +6,7 @@ inference uses sliding-window + Gaussian blending (S9).
 """
 from __future__ import annotations
 
+import sys
 import time
 
 import torch
@@ -142,7 +143,8 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
             torch.cuda.reset_peak_memory_stats(device)
         epoch_start = time.time()
         running_loss = 0.0
-        bar = tqdm(train_loader, desc=f"epoch {epoch + 1}/{epochs}", unit="step", leave=False)
+        bar = tqdm(train_loader, desc=f"epoch {epoch + 1}/{epochs}", unit="step",
+                   leave=False, file=sys.stdout, dynamic_ncols=True)
         for step, batch in enumerate(bar):
             images = batch["image"].to(device)
             labels = batch["label"].to(device)
@@ -156,12 +158,14 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
             scaler.step(optimizer)
             scaler.update()
             running_loss += loss.item()
-            avg_loss = running_loss / (step + 1)
-            its = (step + 1) / max(1e-9, time.time() - epoch_start)
-            bar.set_postfix(loss=f"{avg_loss:.4f}", it_s=f"{its:.2f}")
+            bar.set_postfix(loss=f"{running_loss / (step + 1):.4f}")
             if log_every and (step + 1) % log_every == 0:
-                ctx.logger.info("epoch %d/%d step %d/%d | loss %.4f | %.2f it/s",
-                                epoch + 1, epochs, step + 1, steps_per_epoch, avg_loss, its)
+                its = (step + 1) / max(1e-9, time.time() - epoch_start)
+                # File-only (no_console): the live bar already shows step/loss/it-s in the
+                # terminal; this keeps the granular trace in run.log without fighting the bar.
+                ctx.logger.info("    epoch %d/%d  step %d/%d  loss=%.4f  %.2f it/s",
+                                epoch + 1, epochs, step + 1, steps_per_epoch,
+                                running_loss / (step + 1), its, extra={"no_console": True})
         bar.close()
 
         epoch_time = time.time() - epoch_start
@@ -174,8 +178,10 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
         ctx.metrics.log(step=epoch, split="train", loss=train_loss, epoch_time_s=round(epoch_time, 2),
                         it_per_s=round(its, 3), gpu_mem_gb=round(gpu_gb, 3), lr=lr,
                         eta_hours=round(eta_h, 3))
-        ctx.logger.info("epoch %d/%d | loss %.4f | %.2f it/s | %.1fs | GPU %.2fGiB | lr %g | ETA %.2fh",
-                        epoch + 1, epochs, train_loss, its, epoch_time, gpu_gb, lr, eta_h)
+        ctx.logger.info(
+            "epoch %d/%d done   loss=%.4f  %.2f it/s  %.0fs  GPU %.2fGiB  lr=%g  ETA %.2fh",
+            epoch + 1, epochs, train_loss, its, epoch_time, gpu_gb, lr, eta_h,
+        )
 
         if (epoch + 1) % cfg.train.val_interval == 0 or epoch == epochs - 1:
             dice = validate(model, val_loader, cfg, device)
@@ -186,8 +192,14 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
                 best_dice = dice["mean"]
                 torch.save(model.state_dict(), ctx.run_dir / "best_model.pt")
             ctx.logger.info(
-                "epoch %d/%d | val Dice WT %.3f TC %.3f ET %.3f | mean %.4f | best %.4f%s",
+                "epoch %d/%d   val Dice: WT=%.3f  TC=%.3f  ET=%.3f  mean=%.4f  best=%.4f%s",
                 epoch + 1, epochs, dice["WT"], dice["TC"], dice["ET"], dice["mean"], best_dice,
                 " *saved" if improved else "",
             )
+
+    log_banner(ctx.logger, "Training complete", {
+        "Best val Dice": f"{best_dice:.4f}",
+        "Epochs run": epochs,
+        "Total train time": f"{sum(epoch_times):.0f}s",
+    })
     return best_dice

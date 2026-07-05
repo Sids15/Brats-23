@@ -20,7 +20,16 @@ _ERF_CHANNEL = 2
 
 def run_single(cfg, run_name, train_dirs, val_dirs, eval_dirs, physics_key,
                device=None, base_dir="runs", epochs=None, seed=0) -> dict:
-    """Train + evaluate one model (per ``cfg``); return a summary row of key metrics."""
+    """Train + evaluate one model (per ``cfg``); return a summary row of key metrics.
+
+    Matched-protocol invariant (why cross-architecture comparisons are fair, roadmap S5):
+    the caller passes the SAME ``train/val/eval_dirs`` (one leakage-free split) and the SAME
+    ``cfg`` (preprocessing, patch, optimizer, schedule, loss) to every architecture; only
+    ``cfg.model.name`` changes. Crucially the seed is set *after* ``build_model`` but *before*
+    the data is iterated, so architecture construction can't perturb the data RNG -- every
+    model at a given seed therefore sees the *identical patch sequence*. Do not reorder these
+    two lines: model first, then ``setup_run(set_global_seed=...)``.
+    """
     device = device or get_device()
     train_loader = make_dataloader(train_dirs, cfg, train=True, num_workers=0)
     val_loader = make_dataloader(val_dirs, cfg, train=False, batch_size=1)

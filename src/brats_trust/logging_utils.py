@@ -338,18 +338,37 @@ class RunContext:
             self.logger.removeHandler(handler)
 
 
+class _TqdmLoggingHandler(logging.StreamHandler):
+    """Console handler that emits via ``tqdm.write`` so log lines don't corrupt an active
+    progress bar. Falls back to a plain write when tqdm isn't installed or no bar is live."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        # Records flagged ``no_console`` (e.g. per-step lines) go to run.log only, so the
+        # live progress bar stays the single source of per-step info in the terminal.
+        if getattr(record, "no_console", False):
+            return
+        try:
+            msg = self.format(record)
+            try:
+                from tqdm import tqdm
+
+                tqdm.write(msg, file=self.stream)
+            except ImportError:
+                self.stream.write(msg + self.terminator)
+            self.flush()
+        except Exception:  # noqa: BLE001 - logging must never raise into the caller
+            self.handleError(record)
+
+
 def _build_logger(name: str, log_path: Path) -> logging.Logger:
     logger = logging.getLogger(f"brats_trust.run.{name}")
     logger.setLevel(logging.INFO)
     logger.propagate = False
     logger.handlers.clear()
-    fmt = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)-7s | %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S%z",
-    )
+    fmt = logging.Formatter("%(asctime)s  %(levelname)-7s %(message)s")
     file_handler = logging.FileHandler(log_path, encoding="utf-8")
     file_handler.setFormatter(fmt)
-    stream_handler = logging.StreamHandler(sys.stdout)
+    stream_handler = _TqdmLoggingHandler(sys.stdout)
     stream_handler.setFormatter(fmt)
     logger.addHandler(file_handler)
     logger.addHandler(stream_handler)

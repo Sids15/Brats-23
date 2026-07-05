@@ -48,8 +48,13 @@ src/brats_trust/
     preprocess.py     Brain-crop, per-channel z-score, modality intervention.  [done]
     synthetic.py      S3.5 calibration generator (known class->channel coupling).[done]
     dataset.py        Ablation-capable MONAI loader (4ch in, WT/TC/ET out).    [done]
-  models/
-    scaffold.py       Shared 3D U-Net; pluggable conv/dwsep block (S4 Probe 3).[done]
+  models/               One module per architecture; factory.py is a name->builder registry.
+    base.py           Channel contract + conv blocks + skip alignment (shared).   [done]
+    unet3d.py         Shared 3D U-Net; pluggable conv/dwsep block (S4 Probe 3).   [done]
+    dynunet.py        nnU-Net CNN anchor (MONAI DynUNet, S5).                     [done]
+    unetr.py          ViT transformer anchor (MONAI UNETR, S5).                   [done]
+    swin_unetr.py     Swin transformer anchor (MONAI SwinUNETR, S5).             [done]
+    segmamba.py       Mamba/state-space anchor (needs mamba-ssm; GPU-only, S5).   [done]
   metrics/
     stats.py          Bootstrap CIs, effect sizes, Holm correction (S3, S4.2). [done]
     segmentation.py   Per-region Dice + HD95 + sens/spec (BraTS-2023).         [done]

@@ -48,6 +48,13 @@ def test_unknown_model_raises():
         build_model(cfg)
 
 
+def test_registry_lists_the_five_models():
+    # Each architecture is its own module registered by name; guard against drift.
+    from brats_trust.models import MODELS
+
+    assert set(MODELS) == {"unet3d", "dynunet", "unetr", "swin_unetr", "segmamba"}
+
+
 @pytest.mark.skipif(not _HAS_MAMBA, reason="mamba-ssm not installed (CUDA-only); verify on GPU")
 def test_segmamba_forward():
     model = build_model(_cfg("segmamba", 32)).eval()
