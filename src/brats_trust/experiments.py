@@ -6,6 +6,8 @@ the per-run logic and recorded columns are identical.
 """
 from __future__ import annotations
 
+import torch
+
 from .data.dataset import make_dataloader
 from .engine import get_device, train_model
 from .logging_utils import setup_run
@@ -38,9 +40,15 @@ def run_single(cfg, run_name, train_dirs, val_dirs, eval_dirs, physics_key,
     ctx = setup_run(run_name, cfg, base_dir=base_dir, set_global_seed=seed)
     val_dice = train_model(model, train_loader, val_loader, cfg, ctx, device=device, max_epochs=epochs)
     out = evaluate_and_log(model, eval_dirs, cfg, ctx, device=device, physics_key=physics_key)
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
     erf = measure_erf(model, tuple(cfg.train.patch_size), out_channel=_ERF_CHANNEL, device=device)
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
     faith = faithfulness_score(out["reliance_matrix"], physics_key)
     ctx.finalize(erf=erf, faithfulness=faith, val_dice=val_dice)
+    
+    ctx.logger.info("Run finished: ERF %.2f | Faithfulness %.3f | Val Dice %.4f", erf, faith["overall"], val_dice)
 
     return {
         "model": cfg.model.name, "block": cfg.model.block, "kernel_size": cfg.model.kernel_size,

@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import shutil
 import tempfile
+import time
 from pathlib import Path
 
 import torch
@@ -28,7 +29,7 @@ from brats_trust.logging_utils import write_tidy
 # RF variants: small -> large. Depthwise-separable keeps params modest as the kernel grows,
 # so receptive field is the dominant thing that changes (roadmap S4 Probe 3).
 VARIANTS = [
-    {"name": "rf_small", "block": "conv", "kernel_size": 3},
+    # {"name": "rf_small", "block": "conv", "kernel_size": 3},
     {"name": "rf_med", "block": "dwsep", "kernel_size": 5},
     {"name": "rf_large", "block": "dwsep", "kernel_size": 7},
 ]
@@ -62,6 +63,7 @@ def main() -> None:
     ap.add_argument("--smoke", action="store_true", help="Tiny CPU run on synthetic data.")
     ap.add_argument("--epochs", type=int, default=None)
     ap.add_argument("--seeds", type=int, nargs="*", default=None)
+    ap.add_argument("--limit", type=int, default=None, help="Cap #cases for faster sweep execution.")
     args = ap.parse_args()
 
     cfg = load_config(args.config) if args.config else load_config()
@@ -84,21 +86,33 @@ def main() -> None:
 
     train_dirs = [root / c for c in sp["train"]]
     val_dirs = [root / c for c in sp["val"]]
-    eval_dirs = [root / c for c in (sp["val"] + sp["test"])]
+    test_dirs = [root / c for c in sp["test"]]
+    if args.limit:
+        train_dirs = train_dirs[: args.limit]
+        val_dirs = val_dirs[: max(2, args.limit // 4)]
+        test_dirs = test_dirs[: max(2, args.limit // 4)]
+    eval_dirs = val_dirs + test_dirs
 
     try:
         rows = []
+        start_time = time.time()
         for variant in VARIANTS:
             cfg.model.block = variant["block"]
             cfg.model.kernel_size = variant["kernel_size"]
             for seed in seeds:
-                row = run_single(cfg, f"probe3_{variant['name']}_seed{seed}", train_dirs, val_dirs,
-                                 eval_dirs, physics_key, device=device, base_dir=base, epochs=epochs, seed=seed)
-                rows.append({"variant": variant["name"], **row})
+                try:
+                    row = run_single(cfg, f"probe3_{variant['name']}_seed{seed}", train_dirs, val_dirs,
+                                     eval_dirs, physics_key, device=device, base_dir=base, epochs=epochs, seed=seed)
+                    rows.append({"variant": variant["name"], **row})
+                except Exception as e:
+                    print(f"ERROR: Run probe3_{variant['name']}_seed{seed} failed: {e}")
+
+        total_time = time.time() - start_time
 
         out_dir = Path(args.out)
         write_tidy(out_dir / "probe3_summary", rows, PROBE3_COLUMNS)
         print(f"wrote {len(rows)} runs -> {out_dir / 'probe3_summary.csv'}")
+        print(f"Sweep completed in {total_time / 3600:.2f} hours (avg {total_time / max(1, len(rows)) / 60:.1f} min/run).")
         print("next: python scripts/analyze_probe3.py --summary", out_dir / "probe3_summary.jsonl")
     finally:
         # Smoke data + intermediate run dirs live under a temp base; results are in --out.

@@ -1,10 +1,10 @@
-"""Model layer (roadmap S4/S5).
+"""Model layer: the single shared U-Net scaffold and pluggable blocks for the
+controlled probes (roadmap S4). Tier-A off-the-shelf anchors live here too (S5)."""
+from __future__ import annotations
 
-Each architecture is its own module exposing ``build(cfg)``: ``unet3d`` (the shared scaffold
-+ pluggable blocks for the RF sweep) and the Tier-A anchors ``dynunet``, ``unetr``,
-``swin_unetr``, ``segmamba``. Shared primitives (channel contract, blocks, skip alignment)
-live in ``base``. Build any of them by name through :func:`factory.build_model`.
-"""
-from .factory import MODELS, build_model  # noqa: F401
+from .factory import MODELS, build_model
+from .unet3d import build_scaffold, UNet3D
+from .base import IN_CHANNELS, OUT_CHANNELS, estimate_flops
 
-__all__ = ["build_model", "MODELS"]
+__all__ = ["MODELS", "build_model", "build_scaffold", "UNet3D",
+           "IN_CHANNELS", "OUT_CHANNELS", "estimate_flops"]

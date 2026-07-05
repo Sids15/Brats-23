@@ -1,20 +1,10 @@
-"""Shared 3D U-Net scaffold — the PRIMARY model, used for the RF sweep (roadmap S4).
-
-'Matched stages/widths/skips/patch/optimizer/schedule/init/data/seeds; one pluggable
-block.' Everything except the swapped block is held identical so Probe 3 varies one thing
-at a time: receptive field via the conv ``block`` (``conv`` vs depthwise-separable
-``dwsep``) and ``kernel_size`` -> the ERF<->faithfulness curve (S4.1).
-
-A compact, dependency-light 3D U-Net (not MONAI's) so the pluggable block and receptive
-field are under our direct control. Input 4 channels [FLAIR, T1, T1CE, T2], output 3
-overlapping regions [WT, TC, ET] (sigmoid head; DiceCE handles activation).
-"""
+"""Single shared U-Net scaffold / Instrument (roadmap S4)."""
 from __future__ import annotations
 
 import torch
 from torch import nn
 
-from .base import BLOCKS, IN_CHANNELS, OUT_CHANNELS, align_to
+from .base import IN_CHANNELS, OUT_CHANNELS, BLOCKS, _align_to
 
 
 class UNet3D(nn.Module):
@@ -59,7 +49,7 @@ class UNet3D(nn.Module):
         x = self.bottleneck(x)
         for upconv, dec, skip in zip(self.upconvs, self.decoders, reversed(skips)):
             x = upconv(x)
-            x = align_to(x, skip)
+            x = _align_to(x, skip)
             x = dec(torch.cat([x, skip], dim=1))
         return self.head(x)
 
@@ -73,10 +63,3 @@ def build_scaffold(
 ) -> UNet3D:
     """Construct the shared scaffold with the chosen pluggable block (roadmap S4)."""
     return UNet3D(in_channels, out_channels, tuple(features), block, kernel_size)
-
-
-def build(cfg) -> UNet3D:
-    """Build the scaffold from a config (the ``unet3d`` entry in the model registry)."""
-    return build_scaffold(
-        block=cfg.model.block, features=tuple(cfg.model.features), kernel_size=cfg.model.kernel_size
-    )

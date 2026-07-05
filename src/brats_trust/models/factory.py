@@ -1,38 +1,44 @@
-"""Model registry (roadmap S4 Probe 1 mechanism swap + S5 Tier-A anchors).
+"""Model factory (roadmap S4 Probe 1 mechanism swap + S5 Tier-A anchors).
 
 One entry point, :func:`build_model`, builds any architecture from ``cfg.model.name`` so the
 shared training/measurement pipeline runs each under the *matched global protocol* (S9) --
 the off-the-shelf nets are used as architectures, not via their own training frameworks.
-Each architecture lives in its own module exposing ``build(cfg)``; this file only maps names
-to those builders.
-
-Available names (`MODELS`):
-- ``unet3d``     our shared scaffold (conv/dwsep block; the RF-sweep model, S4 Probe 3).
-- ``dynunet``    nnU-Net's architecture (MONAI DynUNet) -- the CNN anchor (S5).
-- ``unetr``      transformer anchor (MONAI UNETR).
-- ``swin_unetr`` Swin transformer anchor (MONAI SwinUNETR).
-- ``segmamba``   Mamba/state-space anchor (optional; needs mamba-ssm + CUDA -> GPU only).
 """
 from __future__ import annotations
 
 from torch import nn
 
-from . import dynunet, segmamba, swin_unetr, unet3d, unetr
+from .base import IN_CHANNELS, OUT_CHANNELS
+from .unet3d import build_scaffold
+from .dynunet import build_dynunet
+from .unetr import build_unetr
+from .swin_unetr import build_swin_unetr
+from .segmamba import build_segmamba
 
-_REGISTRY = {
-    "unet3d": unet3d.build,
-    "dynunet": dynunet.build,
-    "unetr": unetr.build,
-    "swin_unetr": swin_unetr.build,
-    "segmamba": segmamba.build,
+
+_BUILDERS = {
+    "unet3d": lambda cfg: build_scaffold(
+        block=cfg.model.block,
+        features=tuple(cfg.model.features),
+        kernel_size=cfg.model.kernel_size,
+    ),
+    "dynunet": build_dynunet,
+    "unetr": build_unetr,
+    "swin_unetr": build_swin_unetr,
+    "segmamba": lambda cfg: build_segmamba(
+        in_channels=IN_CHANNELS,
+        out_channels=OUT_CHANNELS,
+        features=tuple(cfg.model.features),
+    ),
 }
 
-MODELS = tuple(_REGISTRY)
+# Public registry of the architectures the matched protocol trains (Probe 1 / Tier-A).
+MODELS = tuple(_BUILDERS)
 
 
 def build_model(cfg) -> nn.Module:
     """Build the architecture named by ``cfg.model.name`` under the matched protocol."""
     name = cfg.model.name
-    if name not in _REGISTRY:
+    if name not in _BUILDERS:
         raise ValueError(f"unknown model name {name!r}; choose from {list(MODELS)}")
-    return _REGISTRY[name](cfg)
+    return _BUILDERS[name](cfg)

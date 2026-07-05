@@ -1,0 +1,11 @@
+# Production-grade sweep configuration for the Stage 2 Receptive-Field Sweep.
+# Keeps the frozen DR7 production patch size (128^3) for full academic rigor.
+# Maximizes GPU VRAM utilization on the RTX 4500 Ada (24 GB) using a batch size of 8.
+# Sets a realistic training budget of 60 epochs to ensure execution completes.
+
+train:
+  patch_size: [128, 128, 128]
+  batch_size: 8
+  max_epochs: 30
+inference:
+  roi_size: [128, 128, 128]
