@@ -87,7 +87,7 @@ def main():
             # SAFE CONFIG for 24GB VRAM
             cfg.train.patch_size = [96, 96, 96]
             cfg.inference.roi_size = [96, 96, 96]
-            cfg.train.num_workers = 4
+            cfg.train.num_workers = 8
 
             physics_key = load_physics_key(cfg)
             root = Path(cfg.data.root)
