@@ -52,7 +52,7 @@ def run_single(cfg, run_name, train_dirs, val_dirs, eval_dirs, physics_key,
 
     return {
         "model": cfg.model.name, "block": cfg.model.block, "kernel_size": cfg.model.kernel_size,
-        "seed": seed, "erf": erf, "faithfulness_overall": faith["overall"],
+        "seed": seed, "epochs": epochs, "erf": erf, "faithfulness_overall": faith["overall"],
         "faith_WT": faith["WT"], "faith_TC": faith["TC"], "faith_ET": faith["ET"],
         "val_dice": val_dice,
     }
