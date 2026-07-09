@@ -44,5 +44,6 @@ target-version = "py310"
 [tool.pytest.ini_options]
 # src layout: make the package importable without a full editable install
 # (which would pull heavy CUDA deps not needed for these torch-free tests).
-pythonpath = ["src"]
+# "." additionally exposes the root-level sweep drivers (run_phase*_robust.py) to tests.
+pythonpath = ["src", "."]
 testpaths = ["tests"]

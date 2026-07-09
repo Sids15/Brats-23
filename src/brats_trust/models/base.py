@@ -116,7 +116,7 @@ def estimate_flops(model: nn.Module, input_size: tuple[int, ...]) -> float:
 
     device = next(model.parameters()).device
     dummy = torch.zeros(*input_size, device=device)
-    
+
     was_training = model.training
     model.eval()
     try:
@@ -131,3 +131,17 @@ def estimate_flops(model: nn.Module, input_size: tuple[int, ...]) -> float:
             model.train()
 
     return float(flops)
+
+
+def model_cost(model: nn.Module, patch_size, in_channels: int = IN_CHANNELS) -> dict[str, float]:
+    """Parameter count and forward FLOPs at ``patch_size``, as one recorded pair.
+
+    Probe 3 claims receptive field grows while params/FLOPs stay comparable (roadmap S4);
+    Probe 1 compares architectures of unequal capacity. Neither claim is checkable unless
+    both numbers land in the per-run summary row, so they are measured once here and
+    reused by the training banner and the sweep summaries alike.
+    """
+    return {
+        "params": float(sum(p.numel() for p in model.parameters())),
+        "flops": estimate_flops(model, (1, in_channels, *patch_size)),
+    }

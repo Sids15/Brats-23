@@ -289,6 +289,46 @@ def write_tidy(stem: Path, rows: list[dict[str, Any]], columns: tuple[str, ...] 
 
 
 # --------------------------------------------------------------------------- #
+# Unmonitored-sweep transcript
+# --------------------------------------------------------------------------- #
+class _TeeStream:
+    """Write-through file object: everything printed also lands in ``path``."""
+
+    def __init__(self, stream: Any, path: Path) -> None:
+        self._stream = stream
+        self._file = open(path, "a", encoding="utf-8")
+
+    def write(self, message: str) -> int:
+        self._stream.write(message)
+        self._file.write(message)
+        self._file.flush()  # a killed sweep must still leave a complete transcript
+        return len(message)
+
+    def flush(self) -> None:
+        self._stream.flush()
+        self._file.flush()
+
+    def isatty(self) -> bool:
+        # tqdm asks this to decide whether to draw a live bar; defer to the real console.
+        return self._stream.isatty()
+
+
+def tee_stdout(path: str | Path) -> Path:
+    """Mirror ``stdout``/``stderr`` into ``path`` for the rest of the process.
+
+    Multi-day sweeps run detached, so the only record of a crash is what was printed. The
+    per-run ``run.log`` files miss anything raised *between* runs (OOM, driver resets), which
+    is exactly what a sweep-level transcript catches.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tee = _TeeStream(sys.stdout, path)
+    sys.stdout = tee
+    sys.stderr = tee
+    return path
+
+
+# --------------------------------------------------------------------------- #
 # Run context
 # --------------------------------------------------------------------------- #
 @dataclass
@@ -381,8 +421,9 @@ def setup_run(
     base_dir: str | Path = "runs",
     seeds: dict[str, Any] | None = None,
     set_global_seed: int | None = None,
+    resume: bool = False,
 ) -> RunContext:
-    """Create a timestamped run directory and return a ready-to-use :class:`RunContext`.
+    """Create a run directory and return a ready-to-use :class:`RunContext`
 
     Writes ``config.yaml`` (resolved snapshot) and ``env.json`` immediately, so even a
     run that crashes in epoch 0 leaves a complete reproducibility record.
@@ -398,8 +439,11 @@ def setup_run(
         set_seed(set_global_seed)
         seeds = {**(seeds or {}), "seed": set_global_seed}
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    run_dir = Path(base_dir) / f"{timestamp}__{name}"
+    if resume:
+        run_dir = Path(base_dir) / name
+    else:
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        run_dir = Path(base_dir) / f"{timestamp}__{name}"
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "results").mkdir(exist_ok=True)
 

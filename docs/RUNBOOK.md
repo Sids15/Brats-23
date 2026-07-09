@@ -102,26 +102,51 @@ apply the §4.2 protocol (report matched + tuned, exclude non-converged under pr
 
 ---
 
-## Stage 3 — Architecture sweep: Probe 1 + Tier-A anchors (§4 Probe 1, §5)  [MONAI anchors CPU-verified; SegMamba GPU-only]
-Compares architectures (CNN / transformer / Mamba) under the *matched* protocol.
+## Stage 3 — Architecture sweep: Probe 1 + Tier-A anchors (§4 Probe 1, §5)  ["Phase 3"; MONAI anchors CPU-verified; SegMamba GPU-only]
+Compares architectures (CNN / transformer / Mamba) under the *matched* protocol. This is the
+sweep the team calls **Phase 3**, and `run_phase3_robust.py` is how you actually launch it —
+it is `run_probe1.py` hardened for a multi-day detached run (resume, sweep-level transcript,
+per-run error isolation).
 ```bash
 # one-time, for the Mamba arm (CUDA build required):
 pip install mamba-ssm causal-conv1d
 
-python scripts/run_probe1.py --config configs/default.yaml --out outputs/probe1
+python run_phase3_robust.py                       # 5 architectures x 5 seeds, configs/phase3.yaml
+python scripts/analyze_probe1.py --summary outputs/phase3/phase3_summary.jsonl
 ```
 Models: `unet3d` (our scaffold), `dynunet` (nnU-Net architecture), `unetr`, `swin_unetr`,
-`segmamba`. Restrict with `--models unet3d dynunet unetr`.
-**Expected:** `outputs/probe1/probe1_summary.csv` — one row per architecture×seed with
-faithfulness (WT/TC/ET + overall), ERF, and val Dice. If `mamba-ssm` is missing you'll see
-`SKIP segmamba: ...` and the others still run.
+`segmamba`. Restrict with `--models unet3d dynunet unetr` / `--seeds 42 43`.
+`scripts/run_probe1.py` remains the plain (non-resumable) form, and is what `--smoke` uses.
+
+**Protocol (`configs/phase3.yaml`):** 96³ patch (UNETR needs /16, SwinUNETR /32),
+`batch_size: 2` — the largest every arm fits in 24 GB — and 30 epochs, **held identical
+across all five architectures**. Do not give one architecture its own batch size without
+reporting it as a tuned deviation (§4.2); otherwise capacity and optimization confound the
+faithfulness comparison.
+
+**Expected:** `outputs/phase3/phase3_summary.csv` — one row per architecture×seed with
+faithfulness (WT/TC/ET + overall), ERF, val Dice, and now **params + FLOPs** (so a reviewer
+can see capacity next to reliance). Then `architecture_summary.csv` (per-architecture mean +
+bootstrap CI), `faithfulness_pairwise.csv` (Cliff's delta + Holm-corrected p per pair),
+`probe1_stats.json`, and `architecture_faithfulness.png`.
+
+**Resume:** re-run the same command. Completed architecture×seed runs are skipped (matched on
+`epochs` in `phase3_summary.jsonl`); an interrupted run restarts from its
+`runs/phase3_<model>_seed<n>/latest_checkpoint.pt`. The full stdout/stderr transcript lands
+in `outputs/phase3/phase3_master_terminal.log`.
+
 **Caveat to keep in the writeup (§4):** an architecture swap changes receptive field +
 optimization + inductive bias at once — report as "contribution under matched protocol",
-never "causes".
-**If `swin_unetr` errors on size:** it needs inputs divisible by 32 and ≥64³ (our 128³
-patch is fine). **If a model OOMs on the GPU:** lower `train.batch_size` or `model.features`;
-send me the error. **What to send me:** `probe1_summary.csv` (+ any failing run's
-`metrics.csv`).
+never "causes". The Spearman ρ that `analyze_probe1.py` prints corroborates Probe 3; it does
+not replace it.
+
+**If `mamba-ssm` is missing:** you'll see `SKIP segmamba: ...` and the other four still run.
+SegMamba uses a stride-2 stem (as the published model does) so its Mamba layers scan 48³
+tokens, not 96³ — without it the Mamba arm will not fit in 24 GB.
+**If a model OOMs on the GPU:** lower `train.batch_size` **in `configs/phase3.yaml`, for all
+architectures at once**, and restart the sweep from scratch; send me the error.
+**What to send me:** `phase3_summary.csv` + `probe1_stats.json` +
+`architecture_faithfulness.png` (+ any failing run's `metrics.csv`).
 
 ---
 

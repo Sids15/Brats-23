@@ -117,9 +117,9 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
     md_start = int(getattr(md, "start_frac", 0.8) * epochs) if md_enabled else epochs
     md_prob = float(getattr(md, "prob", 0.25)) if md_enabled else 0.0
 
-    n_params = sum(p.numel() for p in model.parameters())
-    from .models import IN_CHANNELS, estimate_flops
-    flops = estimate_flops(model, (1, IN_CHANNELS, *cfg.train.patch_size))
+    from .models import model_cost
+    cost = model_cost(model, cfg.train.patch_size)
+    n_params, flops = cost["params"], cost["flops"]
     flops_str = f"{flops / 1e9:.2f}G" if flops > 0 else "N/A"
 
     log_banner(ctx.logger, "BraTS-Trust training", {
@@ -141,7 +141,20 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
 
     best_dice = 0.0
     epoch_times: list[float] = []
-    for epoch in range(epochs):
+    start_epoch = 0
+
+    checkpoint_path = ctx.run_dir / "latest_checkpoint.pt"
+    if checkpoint_path.exists():
+        ctx.logger.info(f"Found existing checkpoint at {checkpoint_path}. Resuming!")
+        ckpt = torch.load(checkpoint_path, map_location=device)
+        model.load_state_dict(ckpt["model"])
+        optimizer.load_state_dict(ckpt["optimizer"])
+        scaler.load_state_dict(ckpt["scaler"])
+        start_epoch = ckpt["epoch"] + 1
+        best_dice = ckpt.get("best_dice", 0.0)
+        ctx.logger.info(f"Resumed from epoch {start_epoch} with best_dice {best_dice:.4f}")
+
+    for epoch in range(start_epoch, epochs):
         model.train()
         if device.type == "cuda":
             torch.cuda.reset_peak_memory_stats(device)
@@ -197,4 +210,14 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
             )
             if device.type == "cuda":
                 torch.cuda.empty_cache()
+                
+        # Save mid-run checkpoint to allow resuming if crashed
+        torch.save({
+            "epoch": epoch,
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "scaler": scaler.state_dict(),
+            "best_dice": best_dice
+        }, checkpoint_path)
+
     return best_dice

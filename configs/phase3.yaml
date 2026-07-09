@@ -1,0 +1,20 @@
+# Phase 3 — Stage 3 architecture sweep: Probe 1 + Tier-A anchors (roadmap S4 Probe 1, S5).
+# Deep-merged over configs/default.yaml. Every value here applies to ALL FIVE architectures
+# unchanged; that is what makes the cross-architecture faithfulness comparison a matched one
+# (roadmap S4.2). Change nothing per-architecture without also reporting it as a deviation.
+
+train:
+  # 96^3 rather than the frozen 128^3: divisible by 32, which UNETR (needs /16) and
+  # SwinUNETR (needs /32) both require, and it is what the Phase 2 RF sweep used.
+  patch_size: [96, 96, 96]
+  # The largest batch every arm fits in 24 GB with AMP. SwinUNETR (feature_size 24) and
+  # SegMamba are the binding constraints; the U-Net scaffold would happily take 8. Held
+  # fixed across architectures on purpose -- a per-architecture batch size would confound
+  # capacity with optimization (roadmap S4.2).
+  batch_size: 2
+  max_epochs: 30
+  val_interval: 5
+  num_workers: 8
+
+inference:
+  roi_size: [96, 96, 96]

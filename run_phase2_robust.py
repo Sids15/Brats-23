@@ -57,7 +57,7 @@ def main():
         {"name": "rf_large", "block": "dwsep", "kernel_size": 7},
     ]
     seeds = [42, 43, 44, 45, 46]
-    epochs = 300
+    epochs = 30
 
     # 3. CHECKPOINT / RESUME LOGIC
     completed_runs = set()
@@ -66,7 +66,8 @@ def main():
             for line in f:
                 if not line.strip(): continue
                 data = json.loads(line)
-                completed_runs.add(f"{data['variant']}_seed{data['seed']}")
+                if data.get("epochs", 0) >= epochs:
+                    completed_runs.add(f"{data['variant']}_seed{data['seed']}")
     
     print(f"Found {len(completed_runs)} completed runs in {summary_file}. They will be skipped.")
 
@@ -86,7 +87,7 @@ def main():
             # SAFE CONFIG for 24GB VRAM
             cfg.train.patch_size = [96, 96, 96]
             cfg.inference.roi_size = [96, 96, 96]
-            cfg.train.num_workers = 4
+            cfg.train.num_workers = 8
 
             physics_key = load_physics_key(cfg)
             root = Path(cfg.data.root)

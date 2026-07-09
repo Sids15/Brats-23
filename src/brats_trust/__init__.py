@@ -11,13 +11,14 @@ __version__ = "0.0.1"
 
 from . import constants  # noqa: F401
 from .config import load_config  # noqa: F401
-from .logging_utils import MetricLogger, RunContext, set_seed, setup_run  # noqa: F401
+from .logging_utils import MetricLogger, RunContext, set_seed, setup_run, tee_stdout  # noqa: F401
 
 __all__ = [
     "constants",
     "load_config",
     "setup_run",
     "set_seed",
+    "tee_stdout",
     "RunContext",
     "MetricLogger",
     "__version__",

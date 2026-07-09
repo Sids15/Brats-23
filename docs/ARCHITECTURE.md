@@ -41,6 +41,9 @@ src/brats_trust/
   logging_utils.py    Reproducibility + research-grade run logging (see S5 below).
   physics_answer_key.json   Physics expectation (documentation artifact).
   engine.py           Train loop + sliding-window inference (AMP on CUDA).     [done]
+  experiments.py      run_single: train -> evaluate -> ERF + faithfulness; the
+                      shared driver behind every sweep. SUMMARY_COLUMNS fixes
+                      the per-run row (incl. params/FLOPs/epochs).             [done]
   pipeline.py         evaluate_and_log: writes all paper-ready tidy outputs.   [done]
   preflight.py        Dataset validation core (shapes/affines/labels/finite).  [done]
   data/
@@ -49,12 +52,14 @@ src/brats_trust/
     synthetic.py      S3.5 calibration generator (known class->channel coupling).[done]
     dataset.py        Ablation-capable MONAI loader (4ch in, WT/TC/ET out).    [done]
   models/               One module per architecture; factory.py is a name->builder registry.
-    base.py           Channel contract + conv blocks + skip alignment (shared).   [done]
+    base.py           Channel contract + conv blocks + skip alignment + model_cost
+                      (params/FLOPs, recorded per run).                           [done]
     unet3d.py         Shared 3D U-Net; pluggable conv/dwsep block (S4 Probe 3).   [done]
     dynunet.py        nnU-Net CNN anchor (MONAI DynUNet, S5).                     [done]
     unetr.py          ViT transformer anchor (MONAI UNETR, S5).                   [done]
     swin_unetr.py     Swin transformer anchor (MONAI SwinUNETR, S5).             [done]
-    segmamba.py       Mamba/state-space anchor (needs mamba-ssm; GPU-only, S5).   [done]
+    segmamba.py       Mamba/state-space anchor; stride-2 stem keeps the Mamba
+                      sequence at (patch/2)^3 (needs mamba-ssm; GPU-only, S5).    [done]
   metrics/
     stats.py          Bootstrap CIs, effect sizes, Holm correction (S3, S4.2). [done]
     segmentation.py   Per-region Dice + HD95 + sens/spec (BraTS-2023).         [done]
@@ -65,9 +70,14 @@ scripts/
   evaluate.py         Evaluate a checkpoint -> all tidy results.
   preflight.py        Validate the real dataset before training (run first).
   run_synthetic_check.py  S3.5 end-to-end sanity check (CPU, no real data).
+  run_probe1.py       Architecture sweep (Probe 1 + Tier-A anchors, S4/S5).
+  analyze_probe1.py   Per-architecture table + pairwise stats + figure (S4.2).
   make_splits.py      CLI wrapper around data.splits.
   security_audit.py   Pre-commit secret/PII scan (enforced gate).
+run_phase2_robust.py  Stage 2 / Probe 3 RF sweep, resumable ("Phase 2").
+run_phase3_robust.py  Stage 3 architecture sweep, resumable ("Phase 3").
 configs/default.yaml  The frozen S9 global protocol.
+configs/phase3.yaml   Stage 3 overrides: 96^3 patch, batch 2, 30 epochs.
 ```
 `[done]` = implemented + tested. The whole chain (load -> train -> infer -> reliance ->
 fragility -> tidy outputs) is verified end-to-end on CPU with synthetic data
