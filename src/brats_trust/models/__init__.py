@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from .factory import MODELS, build_model
 from .unet3d import build_scaffold, UNet3D
-from .base import IN_CHANNELS, OUT_CHANNELS, estimate_flops
+from .base import IN_CHANNELS, OUT_CHANNELS, estimate_flops, model_cost
 
 __all__ = ["MODELS", "build_model", "build_scaffold", "UNet3D",
-           "IN_CHANNELS", "OUT_CHANNELS", "estimate_flops"]
+           "IN_CHANNELS", "OUT_CHANNELS", "estimate_flops", "model_cost"]

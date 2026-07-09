@@ -6,6 +6,12 @@ alongside convolution, with a convolutional decoder. Faithful to the *mechanism*
 under our matched protocol (4-ch in, 3 overlapping regions out) so it's measured like every
 other model.
 
+Like the original, a strided stem downsamples before the first Mamba stage. Mamba's cost is
+linear in sequence length, but the sequence here is *every voxel*: at our 96^3 patch a
+full-resolution first stage would scan 884,736 tokens per sample and exhaust a 24 GB card.
+The stem cuts each spatial dim in half (8x fewer tokens) and the decoder restores full
+resolution before the head, so the output still matches the input grid voxel-for-voxel.
+
 Requires ``mamba-ssm`` (and ``causal-conv1d``), which need a CUDA build -> this runs on the
 GPU machine only. The classes import cleanly without mamba-ssm; instantiation is guarded.
 """
@@ -67,13 +73,19 @@ class _ConvBlock(nn.Module):
 
 
 class SegMamba(nn.Module):
-    """U-Net with Mamba-mixing encoder stages and a convolutional decoder."""
+    """U-Net with a strided stem, Mamba-mixing encoder stages, and a convolutional decoder."""
 
     def __init__(self, in_channels: int = 4, out_channels: int = 3,
                  features: tuple[int, ...] = (32, 64, 128, 256)) -> None:
         super().__init__()
+        # Stride-2 stem: keeps the longest Mamba sequence to (patch/2)^3 tokens.
+        self.stem = nn.Sequential(
+            nn.Conv3d(in_channels, features[0], 3, stride=2, padding=1, bias=False),
+            *_norm_act(features[0]),
+        )
+
         self.encoders = nn.ModuleList()
-        prev = in_channels
+        prev = features[0]
         for f in features:
             self.encoders.append(MambaStage(prev, f))
             prev = f
@@ -87,9 +99,13 @@ class SegMamba(nn.Module):
             self.upconvs.append(nn.ConvTranspose3d(prev, f, kernel_size=2, stride=2))
             self.decoders.append(_ConvBlock(f * 2, f))
             prev = f
+        # Undo the stem so the head predicts on the input grid.
+        self.up_stem = nn.ConvTranspose3d(features[0], features[0], kernel_size=2, stride=2)
         self.head = nn.Conv3d(features[0], out_channels, kernel_size=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        full_res = x
+        x = self.stem(x)
         skips: list[torch.Tensor] = []
         for enc in self.encoders:
             x = enc(x)
@@ -100,6 +116,7 @@ class SegMamba(nn.Module):
             x = upconv(x)
             x = _align_to(x, skip)
             x = dec(torch.cat([x, skip], dim=1))
+        x = _align_to(self.up_stem(x), full_res)
         return self.head(x)
 
 

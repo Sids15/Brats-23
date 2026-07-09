@@ -24,16 +24,11 @@ import torch
 from brats_trust.config import load_config, load_physics_key
 from brats_trust.data import splits, synthetic
 from brats_trust.engine import get_device
-from brats_trust.experiments import run_single
+from brats_trust.experiments import SUMMARY_COLUMNS, run_single
 from brats_trust.logging_utils import write_tidy
 
 # Default architecture set: CNN (our scaffold + nnU-Net), transformer (UNETR/Swin), Mamba.
 DEFAULT_MODELS = ["unet3d", "dynunet", "unetr", "swin_unetr", "segmamba"]
-
-PROBE1_COLUMNS = (
-    "model", "block", "kernel_size", "seed",
-    "erf", "faithfulness_overall", "faith_WT", "faith_TC", "faith_ET", "val_dice",
-)
 
 
 def setup_smoke(cfg):
@@ -45,6 +40,7 @@ def setup_smoke(cfg):
     cfg.train.batch_size = 1
     cfg.train.lr = 0.001
     cfg.train.val_interval = 10
+    cfg.train.num_workers = 0  # worker startup dwarfs the work on a tiny synthetic set
     tmp = Path(tempfile.mkdtemp())
     root = tmp / "data"
     synthetic.generate_dataset(root, n_cases=8, shape=(64, 64, 64),
@@ -93,13 +89,16 @@ def main() -> None:
                 try:
                     rows.append(run_single(cfg, f"probe1_{name}_seed{seed}", train_dirs, val_dirs,
                                            eval_dirs, physics_key, device=device, base_dir=base,
-                                           epochs=epochs, seed=seed))
+                                           epochs=epochs, seed=seed,
+                                           num_workers=cfg.train.num_workers))
                 except ImportError as e:  # e.g. segmamba without mamba-ssm
                     print(f"SKIP {name}: {e}")
 
         out_dir = Path(args.out)
-        write_tidy(out_dir / "probe1_summary", rows, PROBE1_COLUMNS)
+        write_tidy(out_dir / "probe1_summary", rows, SUMMARY_COLUMNS)
         print(f"wrote {len(rows)} runs -> {out_dir / 'probe1_summary.csv'}")
+        print("next: python scripts/analyze_probe1.py --summary",
+              out_dir / "probe1_summary.jsonl")
     finally:
         # Smoke data + intermediate run dirs live under a temp base; results are in --out.
         if args.smoke:

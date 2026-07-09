@@ -117,9 +117,9 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
     md_start = int(getattr(md, "start_frac", 0.8) * epochs) if md_enabled else epochs
     md_prob = float(getattr(md, "prob", 0.25)) if md_enabled else 0.0
 
-    n_params = sum(p.numel() for p in model.parameters())
-    from .models import IN_CHANNELS, estimate_flops
-    flops = estimate_flops(model, (1, IN_CHANNELS, *cfg.train.patch_size))
+    from .models import model_cost
+    cost = model_cost(model, cfg.train.patch_size)
+    n_params, flops = cost["params"], cost["flops"]
     flops_str = f"{flops / 1e9:.2f}G" if flops > 0 else "N/A"
 
     log_banner(ctx.logger, "BraTS-Trust training", {
