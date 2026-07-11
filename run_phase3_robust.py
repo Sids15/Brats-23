@@ -34,12 +34,11 @@ from brats_trust.engine import get_device
 from brats_trust.experiments import SUMMARY_COLUMNS, run_single
 from brats_trust.logging_utils import tee_stdout, write_tidy
 
-CONFIG = "configs/phase3.yaml"
+CONFIG = "configs/sweep.yaml"
 OUT_DIR = Path("outputs/phase3")
 
-# unet3d first (it is the reference our probes are built on), segmamba last (the arm most
-# likely to fail: it needs CUDA-only mamba-ssm and is the heaviest to train).
-ARCHITECTURES = ["unet3d", "dynunet", "unetr", "swin_unetr", "segmamba"]
+# Removed unet3d as we already trained it extensively in Phase 2.
+ARCHITECTURES = ["dynunet", "unetr", "swin_unetr", "segmamba"]
 
 
 def _log(message: str) -> None:
@@ -84,8 +83,9 @@ def main() -> None:
     base_cfg = load_config(args.config)
     physics_key = load_physics_key(base_cfg)
     models = args.models or ARCHITECTURES
-    seeds = args.seeds or base_cfg.seeds_confirmatory
-    epochs = args.epochs if args.epochs is not None else base_cfg.train.max_epochs
+    # 5 seeds for perfect rigorous matching with Phase 2, thanks to NVMe speed!
+    seeds = args.seeds or [42, 43, 44, 45, 46]
+    epochs = args.epochs if args.epochs is not None else 30
 
     root = Path(base_cfg.data.root)
     splits_path = Path(base_cfg.data.splits_path)
@@ -110,6 +110,11 @@ def main() -> None:
 
             cfg = load_config(args.config)  # fresh, so one run can never mutate the next
             cfg.model.name = name
+
+            # EXACT PHASE 2 CONTINUITY MATCH:
+            cfg.train.patch_size = [96, 96, 96]
+            cfg.inference.roi_size = [96, 96, 96]
+            cfg.train.num_workers = 2
 
             _log(f"START {run_id}")
             start = time.time()
