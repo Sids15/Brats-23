@@ -1,0 +1,8 @@
+# Sweep configuration override for the tuned UNETR runs.
+# Lowers the learning rate to 0.00005 to stabilize ViT self-attention convergence.
+
+train:
+  batch_size: 8
+  max_epochs: 30
+  lr: 0.00005
+  num_workers: 8
