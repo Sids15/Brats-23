@@ -19,8 +19,10 @@ from brats_trust.config import load_config
 from brats_trust.experiments import SUMMARY_COLUMNS
 from brats_trust.models import build_model, model_cost
 from brats_trust.models import segmamba as segmamba_module
+from brats_trust.models import swin_unetr as swin_unetr_module
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+PHASE3_YAML = REPO_ROOT / "configs" / "phase3.yaml"
 
 
 def _load_script(name: str):
@@ -171,3 +173,59 @@ def test_analyze_probe1_writes_table_stats_and_figure(tmp_path):
     out = tmp_path / "architecture_faithfulness.png"
     analyze.make_figure(_rows(), arch_rows, out)
     assert out.exists() and out.stat().st_size > 0
+
+
+# ---------------------------------------------------------------------------
+# SwinUNETR config-driven knob tests (Step 1 / Step 4)
+# ---------------------------------------------------------------------------
+
+def test_swin_unetr_reads_feature_size_and_checkpoint_from_config():
+    """The build function must pull feature_size and use_checkpoint from
+    ``cfg.model.swin_unetr``, not from hardcoded constants."""
+    cfg = load_config(PHASE3_YAML)
+    cfg.model.name = "swin_unetr"
+    swin_cfg = cfg.model.swin_unetr
+
+    model = swin_unetr_module.build_swin_unetr(cfg)
+
+    # MONAI stores feature_size as swinViT.embed_dim.
+    assert model.swinViT.embed_dim == swin_cfg.feature_size
+    # use_checkpoint is propagated to each BasicLayer inside the SwinTransformer.
+    assert model.swinViT.layers1[0].use_checkpoint == swin_cfg.use_checkpoint
+
+
+def test_swin_unetr_head_dim_guard():
+    """Assert head_dim = feature_size / num_heads[i] >= 8 at every stage.
+
+    This is the real regression risk: someone lowers feature_size later
+    without touching num_heads and silently degrades the attention mechanism
+    in the one arm whose mechanism is the experimental variable.
+    """
+    cfg = load_config(PHASE3_YAML)
+    swin_cfg = cfg.model.swin_unetr
+    fs = swin_cfg.feature_size
+    num_heads = list(swin_cfg.num_heads)
+
+    for stage_idx, nh in enumerate(num_heads):
+        # SwinUNETR doubles the feature dim at each stage:
+        #   stage 0 → feature_size, stage 1 → 2*fs, stage 2 → 4*fs, stage 3 → 8*fs
+        stage_dim = fs * (2 ** stage_idx)
+        head_dim = stage_dim // nh
+        assert head_dim >= 8, (
+            f"head_dim={head_dim} at stage {stage_idx} "
+            f"(stage_dim={stage_dim}, num_heads={nh}) is below the minimum 8. "
+            f"Adjust num_heads to keep head_dim >= 8 when changing feature_size."
+        )
+
+
+def test_swin_unetr_model_cost_reports_sane_params_and_flops():
+    """model_cost must report nonzero params/FLOPs for the config-driven Swin."""
+    cfg = load_config(PHASE3_YAML)
+    cfg.model.name = "swin_unetr"
+    cfg.train.patch_size = [64, 64, 64]  # must be divisible by 32 for SwinUNETR
+
+    model = build_model(cfg)
+    cost = model_cost(model, cfg.train.patch_size)
+
+    assert cost["params"] > 0, "Swin params should be > 0"
+    assert cost["flops"] > 0, "Swin FLOPs should be > 0"

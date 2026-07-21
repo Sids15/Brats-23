@@ -34,19 +34,18 @@ from brats_trust.engine import get_device
 from brats_trust.experiments import SUMMARY_COLUMNS, run_single
 from brats_trust.logging_utils import tee_stdout, write_tidy
 
-CONFIG = "configs/phase3.yaml"
+CONFIG = "configs/sweep.yaml"
 OUT_DIR = Path("outputs/phase3")
 
-# unet3d first (it is the reference our probes are built on), segmamba last (the arm most
-# likely to fail: it needs CUDA-only mamba-ssm and is the heaviest to train).
-ARCHITECTURES = ["unet3d", "dynunet", "unetr", "swin_unetr", "segmamba"]
+# Removed unet3d as we already trained it extensively in Phase 2.
+ARCHITECTURES = ["dynunet", "unetr", "swin_unetr", "segmamba"]
 
 
 def _log(message: str) -> None:
     print(f"[{time.strftime('%Y-%m-%d %H:%M:%S')}] {message}", flush=True)
 
 
-def load_completed(summary_file: Path, epochs: int) -> set[str]:
+def load_completed(summary_file: Path, epochs: int, suffix: str = "") -> set[str]:
     """Run ids in ``summary_file`` that already finished the full ``epochs`` budget.
 
     A row is only appended after evaluation succeeds, so its presence at the target epoch
@@ -60,7 +59,7 @@ def load_completed(summary_file: Path, epochs: int) -> set[str]:
             continue
         row = json.loads(line)
         if int(row.get("epochs", 0)) >= epochs:
-            completed.add(f"{row['model']}_seed{row['seed']}")
+            completed.add(f"{row['model']}{suffix}_seed{row['seed']}")
     return completed
 
 
@@ -71,6 +70,7 @@ def main() -> None:
     ap.add_argument("--models", nargs="*", default=None, help=f"Subset of {ARCHITECTURES}")
     ap.add_argument("--seeds", type=int, nargs="*", default=None)
     ap.add_argument("--epochs", type=int, default=None)
+    ap.add_argument("--suffix", default="", help="Optional suffix for model names, e.g. '_tuned'")
     args = ap.parse_args()
 
     out_dir = Path(args.out)
@@ -84,8 +84,9 @@ def main() -> None:
     base_cfg = load_config(args.config)
     physics_key = load_physics_key(base_cfg)
     models = args.models or ARCHITECTURES
-    seeds = args.seeds or base_cfg.seeds_confirmatory
-    epochs = args.epochs if args.epochs is not None else base_cfg.train.max_epochs
+    # 5 seeds for perfect rigorous matching with Phase 2, thanks to NVMe speed!
+    seeds = args.seeds or [42, 43, 44, 45, 46]
+    epochs = args.epochs if args.epochs is not None else 30
 
     root = Path(base_cfg.data.root)
     splits_path = Path(base_cfg.data.splits_path)
@@ -95,7 +96,7 @@ def main() -> None:
     val_dirs = [root / c for c in sp["val"]]
     eval_dirs = [root / c for c in (sp["val"] + sp["test"])]
 
-    completed = load_completed(summary_file, epochs)
+    completed = load_completed(summary_file, epochs, suffix=args.suffix)
     _log(f"PHASE 3 SWEEP | device={device} | {len(models)} models x {len(seeds)} seeds "
          f"x {epochs} epochs | {len(completed)} runs already complete")
     _log(f"train={len(train_dirs)} val={len(val_dirs)} eval={len(eval_dirs)} cases")
@@ -103,13 +104,18 @@ def main() -> None:
     rows: list[dict] = []
     for name in models:
         for seed in seeds:
-            run_id = f"{name}_seed{seed}"
+            run_id = f"{name}{args.suffix}_seed{seed}"
             if run_id in completed:
                 _log(f"SKIP {run_id} (already complete)")
                 continue
 
             cfg = load_config(args.config)  # fresh, so one run can never mutate the next
             cfg.model.name = name
+
+            # EXACT PHASE 2 CONTINUITY MATCH:
+            cfg.train.patch_size = [96, 96, 96]
+            cfg.inference.roi_size = [96, 96, 96]
+            cfg.train.num_workers = getattr(cfg.train, "num_workers", 2)
 
             _log(f"START {run_id}")
             start = time.time()

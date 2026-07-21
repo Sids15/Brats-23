@@ -95,6 +95,11 @@ def make_dataloader(
     ``cfg.train.num_workers`` for real training.
     """
     data = [case_to_dict(d) for d in case_dirs]
-    ds = Dataset(data, transform=build_transforms(cfg, train))
+    # Using PersistentDataset to cache decompressed tensors on the fast NVMe
+    # This prevents the CPU from re-unzipping .nii.gz files every epoch!
+    cache_dir = Path(cfg.data.root) / "persistent_cache"
+    cache_dir.mkdir(exist_ok=True)
+    from monai.data import PersistentDataset
+    ds = PersistentDataset(data, transform=build_transforms(cfg, train), cache_dir=str(cache_dir))
     bs = batch_size if batch_size is not None else cfg.train.batch_size
     return DataLoader(ds, batch_size=bs, shuffle=train, num_workers=num_workers)
