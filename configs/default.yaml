@@ -36,6 +36,10 @@ model:
   block: "conv"             # pluggable block: conv | dwsep (RF probe, S4)
   features: [32, 64, 128, 256]
   kernel_size: 3
+  swin_unetr:               # Tier-A anchor config (S5); off-the-shelf defaults
+    feature_size: 24        # MONAI + SwinUNETR-BraTS published value
+    num_heads: [3, 6, 12, 24]
+    use_checkpoint: true    # recompute activations in backward; fits 24 GB at batch 2
 
 train:
   patch_size: [128, 128, 128]

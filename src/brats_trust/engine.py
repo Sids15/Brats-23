@@ -8,6 +8,12 @@ from __future__ import annotations
 
 import time
 
+# Thermal cooldown: pause training every N epochs to let the GPU cool down.
+# Prevents sustained-heat shutdowns during heavy Transformer training (e.g. SwinUNETR).
+# Set aggressively (every 5 epochs, 60 min) to survive multi-day 5-seed Transformer sweeps.
+_COOLDOWN_EVERY_EPOCHS = 5     # pause after every 5 epochs
+_COOLDOWN_SECONDS      = 3600  # 60 minute cooldown
+
 import torch
 from monai.inferers import sliding_window_inference
 from monai.losses import DiceCELoss
@@ -219,5 +225,20 @@ def train_model(model, train_loader, val_loader, cfg, ctx, device=None, max_epoc
             "scaler": scaler.state_dict(),
             "best_dice": best_dice
         }, checkpoint_path)
+
+        # Thermal cooldown: after every _COOLDOWN_EVERY_EPOCHS epochs, exit cleanly.
+        # This completely drops PyTorch from RAM so Windows doesn't page it to the SSD.
+        # A PowerShell wrapper loop will handle the wait and restart.
+        completed_epochs = epoch + 1
+        if (device.type == "cuda"
+                and completed_epochs % _COOLDOWN_EVERY_EPOCHS == 0
+                and completed_epochs < epochs):  # no cooldown after the very last epoch
+            ctx.logger.info(
+                "THERMAL COOLDOWN | completed %d/%d epochs. "
+                "Exiting cleanly to clear RAM. Wrapper script will sleep and restart.",
+                completed_epochs, epochs
+            )
+            import sys
+            sys.exit(42)
 
     return best_dice

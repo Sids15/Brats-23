@@ -107,6 +107,20 @@ Compares architectures (CNN / transformer / Mamba) under the *matched* protocol.
 sweep the team calls **Phase 3**, and `run_phase3_robust.py` is how you actually launch it —
 it is `run_probe1.py` hardened for a multi-day detached run (resume, sweep-level transcript,
 per-run error isolation).
+
+### Pre-check: VRAM survey (run once, before the sweep)
+```bash
+python scripts/check_vram.py                       # all architectures at default config
+python scripts/check_vram.py --models swin_unetr   # just Swin if re-checking after a config change
+```
+Reports peak GPU memory per architecture on a synthetic (batch, 4, 96³) tensor under AMP.
+Use this to confirm whether `feature_size=24 + use_checkpoint=true` fits at `batch_size=2`
+on your GPU. If it does → the defaults in `configs/default.yaml` are correct and the anchor
+stays at its published configuration. If it doesn't → lower `model.swin_unetr.feature_size`
+to 12 and set `num_heads: [1, 2, 4, 8]` (keeps `head_dim=12`; MONAI does not rescale
+these) in `configs/phase3.yaml` and note the deviation.
+
+### Launch
 ```bash
 # one-time, for the Mamba arm (CUDA build required):
 pip install mamba-ssm causal-conv1d
@@ -120,9 +134,12 @@ Models: `unet3d` (our scaffold), `dynunet` (nnU-Net architecture), `unetr`, `swi
 
 **Protocol (`configs/phase3.yaml`):** 96³ patch (UNETR needs /16, SwinUNETR /32),
 `batch_size: 2` — the largest every arm fits in 24 GB — and 30 epochs, **held identical
-across all five architectures**. Do not give one architecture its own batch size without
-reporting it as a tuned deviation (§4.2); otherwise capacity and optimization confound the
-faithfulness comparison.
+across all five architectures**. SwinUNETR anchor config (`feature_size`, `num_heads`,
+`use_checkpoint`) is set in `configs/default.yaml` under `model.swin_unetr`; if your VRAM
+survey shows the published `feature_size=24` does not fit, override in `configs/phase3.yaml`
+only (keeps Phase 2 snapshots unaffected). Do not give one architecture its own batch size
+without reporting it as a tuned deviation (§4.2); otherwise capacity and optimization
+confound the faithfulness comparison.
 
 **Expected:** `outputs/phase3/phase3_summary.csv` — one row per architecture×seed with
 faithfulness (WT/TC/ET + overall), ERF, val Dice, and now **params + FLOPs** (so a reviewer

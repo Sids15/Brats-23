@@ -57,7 +57,9 @@ src/brats_trust/
     unet3d.py         Shared 3D U-Net; pluggable conv/dwsep block (S4 Probe 3).   [done]
     dynunet.py        nnU-Net CNN anchor (MONAI DynUNet, S5).                     [done]
     unetr.py          ViT transformer anchor (MONAI UNETR, S5).                   [done]
-    swin_unetr.py     Swin transformer anchor (MONAI SwinUNETR, S5).             [done]
+    swin_unetr.py     Swin transformer anchor (MONAI SwinUNETR, S5); config-driven
+                       knobs (feature_size, num_heads, use_checkpoint) from
+                       ``cfg.model.swin_unetr``.                                   [done]
     segmamba.py       Mamba/state-space anchor; stride-2 stem keeps the Mamba
                       sequence at (patch/2)^3 (needs mamba-ssm; GPU-only, S5).    [done]
   metrics/
@@ -74,6 +76,8 @@ scripts/
   analyze_probe1.py   Per-architecture table + pairwise stats + figure (S4.2).
   make_splits.py      CLI wrapper around data.splits.
   security_audit.py   Pre-commit secret/PII scan (enforced gate).
+  check_vram.py       VRAM survey: one fwd+bwd per architecture under AMP,
+                       no data needed. Run before committing feature_size.
 run_phase2_robust.py  Stage 2 / Probe 3 RF sweep, resumable ("Phase 2").
 run_phase3_robust.py  Stage 3 architecture sweep, resumable ("Phase 3").
 configs/default.yaml  The frozen S9 global protocol.
